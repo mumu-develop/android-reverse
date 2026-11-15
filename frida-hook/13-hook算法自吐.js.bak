@@ -1,0 +1,226 @@
+// 日志调试 开关
+var _loging = true
+
+function _log() {
+    if (_loging) {
+        console.log(...arguments)
+    }
+}
+
+
+// 数据转换
+function bytesToString(arr) {
+    if (typeof arr === 'string') {
+        return arr;
+    }
+    var str = '',
+        _arr = arr;
+    for (var i = 0; i < _arr.length; i++) {
+        var one = _arr[i].toString(2),
+            v = one.match(/^1+?(?=0)/);
+        if (v && one.length == 8) {
+            var bytesLength = v[0].length;
+            var store = _arr[i].toString(2).slice(7 - bytesLength);
+            for (var st = 1; st < bytesLength; st++) {
+                store += _arr[st + i].toString(2).slice(2);
+            }
+            str += String.fromCharCode(parseInt(store, 2));
+            i += bytesLength - 1;
+        } else {
+            str += String.fromCharCode(_arr[i]);
+        }
+    }
+    return str;
+}
+
+function bytesToHex(arr) {
+    var str = "";
+    for (var i = 0; i < arr.length; i++) {
+        var tmp = arr[i];
+        if (tmp < 0) {
+            tmp = (255 + tmp + 1).toString(16);
+        } else {
+            tmp = tmp.toString(16);
+        }
+        if (tmp.length == 1) {
+            tmp = "0" + tmp;
+        }
+        str += tmp;
+    }
+    return str;
+}
+
+function bytesToBase64(e) {
+    var base64EncodeChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    var r, a, c, h, o, t;
+    for (c = e.length, a = 0, r = ''; a < c;) {
+        if (h = 255 & e[a++], a == c) {
+            r += base64EncodeChars.charAt(h >> 2),
+                r += base64EncodeChars.charAt((3 & h) << 4),
+                r += '==';
+            break
+        }
+        if (o = e[a++], a == c) {
+            r += base64EncodeChars.charAt(h >> 2),
+                r += base64EncodeChars.charAt((3 & h) << 4 | (240 & o) >> 4),
+                r += base64EncodeChars.charAt((15 & o) << 2),
+                r += '=';
+            break
+        }
+        t = e[a++],
+            r += base64EncodeChars.charAt(h >> 2),
+            r += base64EncodeChars.charAt((3 & h) << 4 | (240 & o) >> 4),
+            r += base64EncodeChars.charAt((15 & o) << 2 | (192 & t) >> 6),
+            r += base64EncodeChars.charAt(63 & t)
+    }
+    return r
+}
+
+function main(){
+    Java.perform(function () {
+        console.log("算法助手已开启")
+
+        let MessageDigest = Java.use("java.security.MessageDigest")
+        MessageDigest.getInstance.overload('java.lang.String').implementation= function (a){
+             console.log("=====MD5=====")
+             console.log("算法=》",a)
+             return this.getInstance(a);
+        }
+
+        MessageDigest.update.overload('[B').implementation = function (a){
+             console.log("=====MD5=====")
+            console.log("参数：",bytesToString(a))
+
+             return this.update(a)
+        }
+
+
+        MessageDigest.digest.overload().implementation = function (){
+            console.log("=====MD5=====")
+            let result = this.digest()
+            console.log("算法的结果是 hex：",bytesToHex(result))
+            console.log("算法的结果是 base64：",bytesToBase64(result))
+            return result
+        }
+
+         MessageDigest.digest.overload('[B').implementation = function (aa) {
+            _log("digest参数是->" + bytesToString(aa))
+            var res = this.digest(aa)
+            _log("算法的结果是 hex--》" + bytesToHex(res))
+            _log("算法的结果是 base64--》" + bytesToBase64(res))
+            return res
+        }
+        MessageDigest.digest.overload('[B', 'int', 'int').implementation = function (aa, bb, cc) {
+            _log("digest参数是->" + bytesToString(aa))
+            var res = this.digest(aa, bb, cc)
+            _log("算法的结果是 hex--》" + bytesToHex(res))
+            _log("算法的结果是 base64--》" + bytesToBase64(res))
+            return res
+        }
+
+
+         _log("hmac算法===================")
+         var Mac = Java.use("javax.crypto.Mac")
+        Mac.update.overload('[B').implementation = function (aa) {
+            _log("update参数是->" + bytesToString(aa))
+            return this.update(aa)
+        }
+        Mac.update.overload('[B', 'int', 'int').implementation = function (aa, b, c) {
+            _log("update参数是->" + bytesToString(aa))
+            return this.update(aa, b, c)
+        }
+
+
+        Mac.doFinal.overload().implementation = function () {
+            var res = this.doFinal()
+            _log("算法的结果是 hex--》" + bytesToHex(res))
+            _log("算法的结果是 b64--》" + bytesToBase64(res))
+            return res
+        }
+        Mac.doFinal.overload('[B').implementation = function (aa) {
+            _log("doFinal参数是->" + bytesToString(aa))
+            var res = this.doFinal(aa)
+            _log("算法的结果是 hex--》" + bytesToHex(res))
+            _log("算法的结果是 b64--》" + bytesToBase64(res))
+            return res
+        }
+
+
+        _log("DES ======================================================")
+        let SecretKeyFactory = Java.use("javax.crypto.SecretKeyFactory")
+        SecretKeyFactory.getInstance.overload('java.lang.String').implementation = function (a){
+            console.log("算法=》",a)
+            return this.getInstance(a)
+        }
+
+        SecretKeyFactory.getInstance.overload('java.lang.String', 'java.lang.String').implementation = function (a,b){
+            console.log("算法=》",a,"b=",b)
+             return this.getInstance(a,b)
+        }
+
+        SecretKeyFactory.getInstance.overload('java.lang.String', 'java.security.Provider').implementation = function (a,b){
+            console.log("算法=》",a,"b=",b)
+             return this.getInstance(a,b)
+        }
+
+        var DESKeySpec = Java.use("javax.crypto.spec.DESKeySpec");
+        DESKeySpec.$init.overload('[B').implementation = function (str) {
+            console.log("DES key(str)->", bytesToString(str))
+            return this.$init(str)
+        }
+
+        var IvParameterSpec = Java.use("javax.crypto.spec.IvParameterSpec");
+        IvParameterSpec.$init.overload('[B').implementation = function (str) {
+            console.log("IvParameterSpec S IV（str） ->", bytesToString(str))
+            return this.$init(str)
+        }
+
+
+        IvParameterSpec.$init.overload('[B', 'int', 'int').implementation = function (a, b, c) {
+            console.log('IvParameterSpec S IV（str）-->' + bytesToString(a) + "index-->" + b + "len" + c)
+            console.log('IvParameterSpec S IV（hex）-->' + bytesToHex(a))
+            return this.$init(a, b, c)
+        }
+
+        var Cipher = Java.use("javax.crypto.Cipher");
+        Cipher.getInstance.overload('java.lang.String') .implementation = function (str) {
+            console.log("加密模式->", str)
+            return this.getInstance(str)
+        }
+
+        Cipher.update.overload('[B').implementation = function (aa) {
+            _log("update参数是->" + bytesToString(aa))
+            return this.update(aa)
+
+        }
+
+        Cipher.doFinal.overload('[B').implementation = function (a){
+            var res = this.doFinal(a)
+            _log("算法的结果是 hex--》" + bytesToHex(res))
+            _log("算法的结果是 b64--》" + bytesToBase64(res))
+            return res
+        }
+
+         _log("非对称算法===================")
+        let KeyFactory = Java.use("java.security.KeyFactory")
+
+        KeyFactory.getInstance.overload('java.lang.String').implementation = function (aa) {
+            _log("RSA算法是-->" + aa)
+            return this.getInstance(aa)
+        }
+        var X509EncodedKeySpec = Java.use('java.security.spec.X509EncodedKeySpec')
+        X509EncodedKeySpec.$init.overload('[B').implementation = function (a) {
+            _log("RSA-KEY密钥-->" + bytesToBase64(a))
+            return this.$init(a)
+        }
+
+        var Base64 = Java.use("android.util.Base64")
+        Base64.decode.overload('java.lang.String', 'int').implementation = function (a,b){
+            _log("base64 decode->" + a)
+            return this.decode(a,b)
+        }
+
+
+    })
+}
+setImmediate(main)

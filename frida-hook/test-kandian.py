@@ -1,0 +1,20 @@
+import requests
+
+headers = {
+    "Host": "kandian.wkandian.com",
+    "device-platform": "android",
+    "user-agent": "okhttp/3.12.2",
+}
+
+params = {
+    "zqkd_param": "SYdVi_XPUOzA=cmEU2wd-Oc7Ne4apw1WrWujGkpodE-ali3LriI_3CUsbRE_85-fWvvjL_7kT0JI-WFkZakMEukUwuk2cEW6MTxtBn6RNxUkWkuivVHFuLcWk5y2djViVJIpDbO1pftSiZpXK3c5QnACRXz0Htki2PaCxxM8v5dwTnzOs5AnsWNckqhFKh-W9jgCKghDTPvuDp-U2R2GNX0uOvmtPFvO8kKn1n0cqxQyT2f8VENd_lANFAdb6VzJkj-AJqfyQBjYy3UbsZiZox8_LohTjzOHnC1voorzpUZoogvnTPQYyOS7239lu_fa-TgQ_I4KNTclz8fSY6E1kGd8ZlVA_XRTT2jOOFI8qNNrOMZINoDOyT5cRHzHQ4TQ-ky6llw_GY-aZeEPO_dd8PAmVvhvQYhTrgj3mhTBMAljBdZB7sNO85DGwzfH5gLN0LAqNZg0tT0HAF1e6xjoOybzUp72rjgzbFhPtBmMCYy93qg2uWOJfuNcvOxbk1G7h0ZBh2xrxkXO5f6DLbTPh6uaXUoe7vSQY4DRWvhOzHyO4GxA6fm-D5yK8CxWFsQEBXNE0UU0J79rl8cOT-pikUXLFDCBrgJMuMROV7-Gx2AT1NzGPj_cvcv52VApBaaTuYdhNp2VBtY7ywZUxYi5lX5jmouGT9X5P6CbO5IbG8p1cfVDr5pfbRQnkKvBmtT_gqnbq1_uzixITkfYcRK9SosVYm-WtmwMuEp5tuKApLFSgw2HM8M0STjPV-ma_DfTli5zU_yU_uO2YwQ0uZyU2T76S0erBB9_JkjLvlPZJONs3jJYr_GyaOPVRqlunN7Z_Sgb2PgMimZi2zBN7nmiPJjwsGbTa6LpuNyVtnrzBY5OvO5xl-OReiRmqTeBeUgE28ObTwnqBR9Q1OBrqm8juTUwwqWAsDlXktk9A56AsU5v-fOgwA8dILvyWqScglq03SXbWAMR1W_HwoCxk1QheU4vn0eM2GaFwyH-nkrXXbx4AQcN1GeSdFG4vJPq7zt5I4C3VnygzC2PZX221N9aggPb85-iKcAJ1nj94qSW1-hyat_uZ6-7iSXpiYXufreJgsfTL0ogYYEckPoUNlfMkISeHlPfRau8au2NECiVEXrn8U7PyLlDYemzRhSPV6e3xY93k6qa_yHClb8utcF9KT0APMpMDEwyymfc5XNQg3t_-qFmHjO3_xBldaqyBKsK5aiMUuoaAfCoWW0mjzdxnGbUkCmL7NBGvV77TewFoUQlJy5exb4KR1IwniRViVsVbgLJz0s97PJdSsArXVgoGJshn8yON5t-2EA==",
+}
+
+response = requests.get(
+    "https://kandian.wkandian.com/v3/article/lists.json",
+    params=params,
+    headers=headers,
+)
+
+print(response.status_code)
+print(response.text)

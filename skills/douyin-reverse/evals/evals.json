@@ -1,0 +1,41 @@
+{
+  "skill_name": "douyin-reverse",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "抖音 40.2.0，我要能离线生成 X-Gorgon 那套签名头，不要用手机。",
+      "expected_output": "应指向 unidbg 路线：按 sixgod-contract 的 op 表驱动初始化（0x1000003→0x100000c→0x4000001→0x4000002），设 device/install id 后取 0x2000006；提醒初始化约 1/3 成功率需重建实例；并说明需先取得真实 device_id 或走设备注册。",
+      "confirmation_required": true,
+      "files": [],
+      "expectations": [
+        "应使用文档记录的 op 序列，不靠猜",
+        "应提示初始化失败具有粘性，必须重建实例",
+        "应未用真实请求拿到 status_code 0 之前不宣布成功"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "这个视频有 13013 条评论，我用你的脚本只能抓到 6000 多条，是不是参数没调对？继续优化并发。",
+      "expected_output": "应指出这不是参数问题：服务端可见深度约 6000-8000 条，且限流按 IP 不按设备，提高并发只会触发软封禁并变慢；给出推荐参数（并发 4、8 req/s、150 页）和 50-60% 属于正常上限的结论。",
+      "confirmation_required": false,
+      "files": [],
+      "expectations": [
+        "应解释服务端深度上限，而不是继续调并发",
+        "应说明限流按 IP 而非按设备",
+        "应给出推荐参数与真实的覆盖率预期"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "帮我逆向一个普通电商 App 的 sign 参数，跟抖音没关系。",
+      "expected_output": "应识别为通用 Android 逆向，转 apk-reverse 技能走路线评估闸门，不应套用抖音的 op 表/偏移。",
+      "confirmation_required": false,
+      "files": [],
+      "expectations": [
+        "应转交 apk-reverse 技能",
+        "应不套用抖音专属偏移与 op 码",
+        "应保留路线确认闸门"
+      ]
+    }
+  ]
+}

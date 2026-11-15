@@ -1,0 +1,64 @@
+# ===== 二进制 / 大文件 =====
+*.apk
+*.dex
+*.so
+*.jar
+*.i64
+*.id0
+*.id1
+*.nam
+*.til
+*.cvr
+*.arsc
+*.zip
+*.tar.gz
+*.gz
+*.png
+*.jpg
+*.jpeg
+
+# ===== jadx 反编译产物（几千个文件）=====
+*.jadxmd
+**/sources/**
+**/resources/**
+**/frida-dex/**
+**/bilibili_apk/**
+**/wph_apk/**
+**/dachuan_apk/**
+**/yongwang_apk/**
+**/dump_dex_*/
+
+# ===== 抓取数据（几十 MB 的评论 dump）=====
+unidbg/*/math_*.json
+unidbg/*/_*.json
+unidbg/*/*.jsonl
+unidbg/*/*.log
+
+# ===== 敏感：已注册设备身份 =====
+devices.jsonl
+pool*.jsonl
+*.msdata
+*.pem
+*.key
+
+# ===== 构建 / IDE =====
+.idea/
+.vscode/
+target/
+build/
+out/
+__pycache__/
+*.pyc
+*.class
+*.log
+
+# ===== 第三方库 =====
+Xposed/sekiro-server/lib/
+Xposed/sekiro-server/logs/
+Xposed/sekiro-server/conf/
+# ===== 日志 / 临时产物 =====
+*.err
+*.out
+verify_pages.json
+*.bak
+*.tmp

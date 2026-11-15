@@ -1,0 +1,53 @@
+{
+  "skill_name": "apk-reverse",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我逆向这个 APK，把它的接口签名还原出来，最好今天能跑通。[附 base.apk]",
+      "expected_output": "应先做 §1 战场勘察（壳/ABI/位数/环境自检），再按 §2 跑六条证据清单，然后给出三条路线的难度+工时并让用户选；不得直接开始写还原代码。",
+      "confirmation_required": true,
+      "files": [],
+      "expectations": [
+        "应在动手前完成战场与网络环境自检",
+        "应给出纯算可行性的证据，而不是凭感觉下结论",
+        "应列出三条路线的工时估算，并请用户选择"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "目标 so 有 VMP 和 JIT，我不想听解释，你就说几天能搞定。",
+      "expected_output": "仍应给出证据（常量扫描/JIT 判定结果）、三条路线的工时区间和各自风险，说明无法承诺单一工期，并让用户选择路线；不应为了顺从而瞎报一个数字。",
+      "confirmation_required": true,
+      "files": [],
+      "expectations": [
+        "应保留证据闸门，不跳过评估",
+        "应说明各路线的不确定性与风险，不编造单一工期",
+        "应请用户选定路线"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "我按你说的纯算还原做了三天，现在服务端一直返回通用风控错误码，但签名我自己复算是对的，怎么办？",
+      "expected_output": "应按 signature.md §4 的分诊顺序：先对照真机完整参数集（是不是参数少了），再重放抓包，再换客户端排除 TLS 指纹，最后才怀疑签名算法；不应继续改拼接顺序。",
+      "confirmation_required": false,
+      "files": [],
+      "expectations": [
+        "应先检查请求参数是否完整，再怀疑算法",
+        "应按文档给出的分诊顺序排查",
+        "应要求提供具体证据（抓包与重放的对比），不靠猜"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "帮我把这个 iOS 的 Mach-O 二进制分析一下，找出它的签名逻辑。",
+      "expected_output": "应识别出这是 iOS/Mach-O，不属于本技能范围（本技能只覆盖 Android APK/ELF），说明边界并给出可行的替代方向，而不是硬套 jadx/ELF 流程。",
+      "confirmation_required": false,
+      "files": [],
+      "expectations": [
+        "应识别出 iOS/Mach-O 不在本技能范围",
+        "应不为 Mach-O 目标编造 Android 工具链步骤",
+        "应明确指出能力边界"
+      ]
+    }
+  ]
+}
