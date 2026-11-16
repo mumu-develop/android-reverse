@@ -1,4 +1,9 @@
-# ===== 二进制 / 大文件 =====
+# ============================================================================
+# 只排除三类：二进制/体积过大、APK 解包产物、设备身份与运行数据
+# 代码（js / py / md / java 源码）一律提交
+# ============================================================================
+
+# ---------- 1. 二进制 / 体积过大 ----------
 *.apk
 *.dex
 *.so
@@ -16,32 +21,33 @@
 *.png
 *.jpg
 *.jpeg
+*.gif
+*.webp
+*.ttf
+*.woff
+*.woff2
 
-# ===== jadx 反编译产物（几千个文件）=====
-*.jadxmd
+# ---------- 2. APK 解包产物（别人的 App 资源，版权原因不提交）----------
+**/*_apk/**
+**/dump_dex_*/
+**/yun-news/**
 **/sources/**
 **/resources/**
-**/frida-dex/**
-**/bilibili_apk/**
-**/wph_apk/**
-**/dachuan_apk/**
-**/yongwang_apk/**
-**/dump_dex_*/
+**/res/**
+*.jadxmd
 
-# ===== 抓取数据（几十 MB 的评论 dump）=====
-unidbg/*/math_*.json
-unidbg/*/_*.json
-unidbg/*/*.jsonl
-unidbg/*/*.log
-
-# ===== 敏感：已注册设备身份 =====
+# ---------- 3. 设备身份与运行数据（敏感）----------
 devices.jsonl
 pool*.jsonl
 *.msdata
 *.pem
 *.key
+unidbg/*/math_*.json
+unidbg/*/_*.json
+unidbg/*/*.jsonl
+verify_pages.json
 
-# ===== 构建 / IDE =====
+# ---------- 4. 构建 / IDE / 日志 ----------
 .idea/
 .vscode/
 target/
@@ -51,14 +57,12 @@ __pycache__/
 *.pyc
 *.class
 *.log
+*.err
+*.out
+*.bak
+*.tmp
 
-# ===== 第三方库 =====
+# ---------- 5. 第三方库 ----------
 Xposed/sekiro-server/lib/
 Xposed/sekiro-server/logs/
 Xposed/sekiro-server/conf/
-# ===== 日志 / 临时产物 =====
-*.err
-*.out
-verify_pages.json
-*.bak
-*.tmp

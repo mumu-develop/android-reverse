@@ -1,0 +1,6 @@
+curl -H "x-http-locale: zh-cn" -H "x-http-version: 2.3.72" -H "x-http-screenheight: 2560" -H "x-http-deviceuid: 1104a89793fd854c51a" -H "j-http-devicetoken: 1104a89793fd854c51a" -H "x-http-osversion: 9" -H "x-client-nonce: fwgVreqshEZIo86Jw/twNJ2NLYDKo6QH" -H "x-http-devicetype: android" -H "x-client-pubkey: c2dcb063d3339acf27e7e4749438fc8d6826bd9d5e02d1673028790939391d1e" -H "x-http-channel: app" -H "x-http-vendortype: REDMI" -H "x-http-devicetoken: 1104a89793fd854c51a" -H "x-http-encryption: 1" -H "x-http-token: " -H "x-http-screenwidth: 1440" -H "Content-Type: application/json;charset=UTF-8; charset=UTF-8" -H "User-Agent: Dalvik/2.1.0 (Linux; U; Android 9; 25102RKBEC Build/PQ3A.190605.07291804)" -H "Host: delivery.aeonbuy.com" --data-binary "esLs/upor9NgMdvWMHRaE1ilohUGUZajGhdVc7RutXUMG6URt6rswWVz7kpsgLLkxedw6PJ0hUyG
+E+mmjhwiOo7uMVc7Qc1nUWLzo/swBHPp/vFekdYb1j+fkJnyvF56bOuSQ4+g1mBucXL0cv7tCGZB
+xwvLw9PRIEDG3/P1fXcyU8qMgJ/ka4ObgNjvdkkQ+e0ycq4otd2Cgjd1R4RtfYUklFLOHFqiFjRa
+/AKl1WK9C2jKJ2720YwkqgnbhvlOp8LywF3j2tul819d3LDWqNopQTbgaeVpRGNLF5mJBofbb/ja
+lsK4BAVZjs3vYQ==
+" --compressed "https://delivery.aeonbuy.com/api/app-api/delivery/search/categoryProductList"
