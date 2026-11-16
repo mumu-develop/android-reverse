@@ -107,7 +107,23 @@ referer
 **`main_hmac` 是服务端按设备下发的密钥**，本地无法凭空生成（它是 shield 的 AES 输入，
 服务端必须持有同一把才能验签）。
 
-### 拿到多台设备的可行路径
+### 拿到多台设备：多用户铸造（已验证）
+
+`main_hmac` 是按 **ANDROID_ID**（用户+签名隔离）下发的，不是账号绑定。
+新建 Android 用户 → 安装小红书 → 首次启动点同意 → App 自己注册出新设备：
+
+```
+user 10 → deviceId fc5a28d7-3dbd-3bf5-af44-4713734b9a38
+          hmac     X7Jt8EZ0e3YkCPJslELY8/hBBaPA38Ta...
+实测：新设备签名 + 真实会话 → HTTP 200 / code=0 / 10 条数据 ✅
+```
+
+工具：`Xposed/小红书/xhs_mint_device.py`（`--out devices.jsonl` 存设备池）
+
+> 坑：该机型 `am switch-user` 偶发卡住 system_server，需要 reboot 恢复；
+> 铸完要立刻采集（用户停止后 FBE 会锁数据目录）。
+
+### 其他路径
 
 1. **采集真机身份**（当前最实际，工具已提供）
    ```bash
