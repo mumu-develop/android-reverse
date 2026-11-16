@@ -96,17 +96,28 @@ referer
 
 | 尝试 | 结果 |
 |---|---|
-| 真实 deviceId + 真实 hmac | ✅ 服务端接受 |
+| 真实 deviceId + 真实 hmac + 真实 common | ✅ HTTP 200 / code 0 / 10 条数据 |
+| **真实 deviceId + 真实 common + 随机 hmac** | ❌ HTTP 406 |
 | 随机 deviceId + 随机 hmac | ❌ HTTP 406 |
+| 随机 hmac 调 `device/regist` | ❌ HTTP 406 |
+
+最后一组是隔离实验：只把 hmac 换成随机值，其余（deviceId / common / UA）全部真实，
+依然 406 —— 说明**服务端直接校验 hmac 本身**，不是校验设备指纹。
 
 **`main_hmac` 是服务端按设备下发的密钥**，本地无法凭空生成（它是 shield 的 AES 输入，
 服务端必须持有同一把才能验签）。
 
 ### 拿到多台设备的可行路径
 
-1. **采集真机身份**（当前最实际）
-   - 新设备：清 App 数据 → 首次启动（游客即可）→ 读 `shared_prefs/s.xml` 的 `main_hmac`
-   - deviceId 从抓包 `xy-common-params` 取
+1. **采集真机身份**（当前最实际，工具已提供）
+   ```bash
+   # 读当前身份
+   python Xposed/小红书/xhs_harvest_device.py --serial <序列号> --out devices.jsonl
+   # 破坏性：清数据造新身份（游客态即可，但会丢登录）
+   python Xposed/小红书/xhs_harvest_device.py --clear --out devices.jsonl
+   ```
+   - deviceId ← `shared_prefs/pre_device.xml.xml` 的 `device_id`
+   - hmac ← `shared_prefs/s.xml` 的 `main_hmac`
    - 一条 (deviceId, hmac) 可长期离线复用，被封再换下一条
 2. **逆向 hmac 下发流程**（未完成）
    - 接口已定位：`/api/sns/v2/system_service/device/regist`
