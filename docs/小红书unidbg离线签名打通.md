@@ -107,7 +107,36 @@ referer
 **`main_hmac` 是服务端按设备下发的密钥**，本地无法凭空生成（它是 shield 的 AES 输入，
 服务端必须持有同一把才能验签）。
 
-### 拿到多台设备：多用户铸造（已验证）
+### 拿到多台设备：ANDROID_ID 指纹伪造（已打通，最快）
+
+**关键发现**：服务端按 **ANDROID_ID** 下发 (deviceId, main_hmac) 密钥对。
+
+用 Xposed 钩 `Settings.Secure.getString("android_id")` 返回伪造值，
+再清掉 `s.xml` / `pre_device.xml.xml`，App 就会以为自己是全新设备，
+自动向服务端注册出一对新密钥：
+
+```
+伪造 AID ad8210c6f197c497
+  → deviceId 3efdd6e1-81f3-3013-80a8-d958536e194b
+  → hmac     8e4ZikR5VdjsNnx6o4ReNAuK5X18pn8Uy8belEZtigIf19hcNkbHsrleuOE2JBVKq...
+  → 服务端接受（HTTP 200，不是 406）
+```
+
+工具：`Xposed/小红书/xhs_spoof_device.py`（一轮约 40 秒，自动恢复原身份）
+
+```bash
+python xhs_spoof_device.py --serial <序列号> --count 5 --out devices.jsonl
+```
+
+实测输出：
+```
+原设备: 80e5f6b9-a89c-3c25-bbdd-77f1e19bbbec
+[1/1] 伪造 ANDROID_ID = caf6111c5615fbba
+  ✓ deviceId = 883cd8e1-cda6-3446-aa09-bea77ac3623f
+恢复原身份: 80e5f6b9-...
+```
+
+### 拿到多台设备：多用户铸造（备用）
 
 `main_hmac` 是按 **ANDROID_ID**（用户+签名隔离）下发的，不是账号绑定。
 新建 Android 用户 → 安装小红书 → 首次启动点同意 → App 自己注册出新设备：
