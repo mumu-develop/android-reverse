@@ -108,12 +108,29 @@ def mint_one(serial, timeout=120):
     su(serial, "mv -f %s/s.xml %s/s.xml.mint 2>/dev/null" % (PREFS, PREFS))
     su(serial, "mv -f %s/pre_device.xml.xml %s/pre_device.xml.xml.mint 2>/dev/null" % (PREFS, PREFS))
 
+    # 清 MMKV：游客会话（sid）存在这里，清掉后 App 会为新设备重新申请，
+    # 从而拿到新的一份配额（实测每台设备约 47 次请求）
+    base = "/data/data/%s" % PKG
+    su(serial, "rm -rf %s/files/mmkv; mkdir -p %s/files/mmkv" % (base, base))
+    su(serial, "chown u0_a259:u0_a259 %s/files/mmkv; restorecon %s/files/mmkv 2>/dev/null"
+       % (base, base))
+
     su(serial, "am start -n %s >/dev/null 2>&1" % ACT)
 
     t0 = time.time()
     while time.time() - t0 < timeout:
         d, h = read_identity(serial)
         if d and h:
+            # 第二次启动：清掉 MMKV 再重启，让 App 为这台新设备申请游客会话
+            # （实测一次启动只会得到空 id_token 的会话，需要第二次才可用）
+            base = "/data/data/%s" % PKG
+            su(serial, "am force-stop %s" % PKG)
+            time.sleep(2)
+            su(serial, "rm -rf %s/files/mmkv; mkdir -p %s/files/mmkv" % (base, base))
+            su(serial, "chown u0_a259:u0_a259 %s/files/mmkv; restorecon %s/files/mmkv 2>/dev/null"
+               % (base, base))
+            su(serial, "am start -n %s >/dev/null 2>&1" % ACT)
+            time.sleep(15)
             return d, h, aid
         time.sleep(3)
     return read_identity(serial)[0], read_identity(serial)[1], aid
