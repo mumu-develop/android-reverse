@@ -228,3 +228,41 @@ python xhs_unidbg_demo.py --common-file cp.txt stress --n 20
 4. 缺 `ContextHolder.writeLog` 桩 → `intercept` 返回空
 5. 同 JVM 多个 unidbg 实例会偶发 handle 冲突 → 尽量分离进程
 6. Gradle 的 `gradle-daemon-jvm.properties` 里 `toolchainVersion=25` 会导致下载 JDK 25 失败 → 删掉
+
+
+---
+
+## 补充：设备身份的离线推导（2026-11-17 夜）
+
+### 1. deviceId 算法（已验证）
+
+```
+step1    = UUID.nameUUIDFromBytes(ANDROID_ID.getBytes())          # md5
+deviceId = UUID.nameUUIDFromBytes((step1 + 毫秒时间戳).getBytes())
+```
+
+实测：
+```
+md5("abcdef0123456789")                      → 342645b1-9f3f-31e3-9077-dc1ec0232ac7
+md5("342645b1-...-dc1ec0232ac7"+"1794927383073") → dc955dbd-e5b1-3451-b37a-c50d415e7521
+```
+与 App 生成值逐字符一致（通过 hook `UUID.nameUUIDFromBytes` 抓到入参）。
+
+### 2. hmac 的下发点（已定位）
+
+响应头 **`Xy-Ter-Str`**，128 字符 base64。
+
+- 已注册设备：该值 == `s.xml` 里的 `main_hmac`（逐字符匹配）
+- 任意请求都会返回（连 406 都有）
+- 命中接口：`device_type`、`user/activate`、`redconfig`、`permission/report`
+
+### 3. 到哪一步了
+
+| 环节 | 状态 |
+|---|---|
+| deviceId 纯算法生成 | ✅ |
+| 从 `Xy-Ter-Str` 拿 hmac | ✅ |
+| unidbg 用伪设备签名，服务端接受 | ✅ HTTP 200（数据接口） |
+| `/user/activate` 创建游客会话 | ❌ 406（真实设备复刻请求也是 406，待查） |
+
+结论：**设备指纹可以完全离线批量生成**；**会话创建还差一步**。
