@@ -317,3 +317,46 @@ ssk       : (X25519 协商结果)
 - `x-mini-*` 有时效（目前复用抓包值），过期需重新抓
 - 每个「设备+会话」每天约 47 次配额
 - 未登录账号的游客态同样受配额限制
+
+
+---
+
+## libtiny（x-mini）逆向进展
+
+### 1. 结构
+
+`libtiny.so` 只导出 `JNI_OnLoad`，通过 `RegisterNatives` 注册 **1 个** native：
+
+```
+class : com/xingin/tiny/internal/t
+method: a(int, Object[]) -> Object
+addr  : base + 0x97a01
+```
+
+### 2. 调用约定（真机 hook 确认）
+
+```
+t.a(98859282, ["", host, "/"+path, query, null])
+  → { x-mini-gid, x-mini-s1, x-mini-sig, x-mini-mua }
+```
+
+magic = **98859282**（通过 hook `t.a` 抓返回值里含 x-mini 的那次得到）。
+
+### 3. unidbg 侧现状
+
+- 用**原始小红书 APK** 建 VM（不需要打包 dex）+ `libtiny.so`
+- 手动调 `JNI_OnLoad` 后，`nativesMap` 能拿到
+  `a(I[Ljava/lang/Object;)Ljava/lang/Object; = base+0x97a01`
+- 但调用返回 **null**
+
+### 4. 为什么需要 APK
+
+unidbg 调的是 **JNI 方法**，参数是 Java 对象（jstring/jobjectArray）、返回值是 Java Map。
+所以需要 dex 提供「类名 + 方法签名」这些元数据；**代码本身全在 .so 里**。
+直接用原始 APK 即可，不需要任何重新打包。
+
+### 5. 下一步
+
+`t.a` 内部依赖 App 上下文（`sjc.f`），需要先走初始化。
+做法：hook 启动时**所有** `t.a` 调用，记录 magic 顺序，找到 init 那几个，
+在 unidbg 里按序复现（补 Context / PackageInfo 等桩）。
