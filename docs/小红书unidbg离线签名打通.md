@@ -266,3 +266,54 @@ md5("342645b1-...-dc1ec0232ac7"+"1794927383073") → dc955dbd-e5b1-3451-b37a-c50
 | `/user/activate` 创建游客会话 | ❌ 406（真实设备复刻请求也是 406，待查） |
 
 结论：**设备指纹可以完全离线批量生成**；**会话创建还差一步**。
+
+
+---
+
+## 最终突破：完全离线造设备 + 造会话（2026-11-17 深夜）
+
+### 1. shield 覆盖的不只是 URL
+
+**关键发现**：`shield` 的签名输入包含 **请求头**，不只是 URL（和 body）。
+
+- 只传 URL + body → `activate` 返回 406
+- 传入**完整请求头**（x-legacy-*、xy-direction、x-mini-* 等）→ **200**
+
+前缀也不代表 HTTP 方法（GET/POST 都有两种前缀变体），是别的东西。
+
+### 2. `/api/sns/v1/user/activate` 可以用我们的签名调通
+
+```
+POST /api/sns/v1/user/activate
+body: android_id=<AID>&did_cur_value=<32hex>&client_public_key_base64=<X25519公钥>&...
+签名: unidbg + 完整头
+→ HTTP 200
+→ 响应: session / secure_session / user_token / userid / ssk
+```
+
+实测返回：
+```
+session   : 1794928226117013318392   → sid = session.1794928226117013318392
+user_token: 2afc716765c0aca188579a81ec8ccf48
+userid    : 6afacf2d0000000005005c03
+ssk       : (X25519 协商结果)
+```
+
+### 3. 完整离线链路（已跑通）
+
+```
+随机 AID
+  → deviceId = uuid3(uuid3(AID) + 毫秒时间戳)        [纯算法]
+  → 任意请求 → 响应头 Xy-Ter-Str = hmac              [无需签名]
+  → unidbg 签名（URL + body + 完整头）               [离线]
+  → POST /user/activate → sid / user_token / ssk     [离线]
+  → 带 sid 请求 homefeed → 200                        [仅受每日配额限制]
+```
+
+实测最后一步返回 `code=-20240855 访问次数已达上限`（不是 406），说明**签名与会话都被接受**，只是当天配额用尽。
+
+### 4. 仍需注意
+
+- `x-mini-*` 有时效（目前复用抓包值），过期需重新抓
+- 每个「设备+会话」每天约 47 次配额
+- 未登录账号的游客态同样受配额限制
