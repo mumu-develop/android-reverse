@@ -404,3 +404,64 @@ App 界面显示的图文是**本地缓存**（图片、标题都能显示，但
 ```
 
 设备维度可以批量造（已验证），会话维度需要账号。
+
+
+---
+
+## 【重要更正】免登录采集方案已打通（2026-11-18 晚）
+
+### 之前的结论错了
+
+之前判断「必须登录」是基于**App 接口**（`/api/sns/v6/homefeed`）的 `-100`。
+但 **Web 端页面（SSR）不需要登录**，只要用对 TLS 指纹即可。
+
+### 关键：curl_cffi 的 TLS 指纹模拟
+
+小红书会按 **TLS 指纹**区分浏览器和脚本：
+
+```python
+from curl_cffi import requests as cr
+r = cr.get("https://www.xiaohongshu.com/explore",
+           impersonate="chrome",   # ← 关键
+           timeout=30, verify=False)
+```
+
+用普通 `requests`/`urllib` → 登录墙；用 `impersonate="chrome"` → 正常返回数据。
+
+### 数据在页面的 __INITIAL_STATE__ 里
+
+```
+<script>window.__INITIAL_STATE__={...}</script>
+```
+
+| 页面 | 路径 | 内容 |
+|---|---|---|
+| 发现页 `/explore` | `.feed.feeds` | 推荐流：id / xsecToken / 标题 / 作者 / 点赞 / 封面 |
+| 笔记页 `/explore/<id>?xsec_token=` | `.note.noteDetailMap` | 详情：正文/图片/标签/互动数/评论 |
+| 用户页 `/user/profile/<uid>` | `.user.notes` | 该用户的笔记（**noteId 被置空**，拿不到 id） |
+
+### 实测数据
+
+```
+推荐流: 31 条/次，每次全部是新的
+  4 次请求 → 114 条不重复笔记
+  2 轮批量 + 详情 → 62 条完整笔记（含赞/藏/评/图片/标签）
+```
+
+### 限制
+
+- 用户主页的笔记列表**拿不到 noteId**（小红书故意置空），只能拿标题/点赞/封面
+- 搜索页 SSR 为空（前端渲染）
+- 笔记列表接口 `/api/sns/web/v1/user_posted` 需要 `x-s` 签名，用 xhshow 签名仍 406（a1 未被认可）
+
+### 工具
+
+`Xposed/小红书/xhs_web_scraper.py`
+
+```bash
+python xhs_web_scraper.py feed                 # 推荐流 30 条
+python xhs_web_scraper.py feed --detail 5      # 前 5 条取详情
+python xhs_web_scraper.py note <id> <token>    # 笔记详情
+python xhs_web_scraper.py user <user_id>       # 作者笔记列表
+python xhs_web_scraper.py batch --pages 5 --out notes.jsonl
+```
