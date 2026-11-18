@@ -360,3 +360,47 @@ unidbg 调的是 **JNI 方法**，参数是 Java 对象（jstring/jobjectArray�
 `t.a` 内部依赖 App 上下文（`sjc.f`），需要先走初始化。
 做法：hook 启动时**所有** `t.a` 调用，记录 magic 顺序，找到 init 那几个，
 在 unidbg 里按序复现（补 Context / PackageInfo 等桩）。
+
+
+---
+
+## 最终结论：签名与协议已完全正确，卡在「会话过期」（2026-11-18 上午）
+
+### 验证结果
+
+| 验证项 | 结果 |
+|---|---|
+| 我们的 shield vs App 的 shield | **前 44 字符完全一致**（`XYjf4AB1Vpnoqm16RIlJz5YE0J9NlS1q7ImFmUvmflcoDbfcKh/x`） |
+| 22 个请求头 | 全部一致（值逐项比对） |
+| `xy-platform-info` | 完全一致 |
+| `xy-common-params` 时间戳 | 新鲜（约 60 秒内） |
+| unidbg 时间 | `clock_gettime(CLOCK_REALTIME)` = `System.currentTimeMillis()`，真实时间 |
+| 设备系统属性对齐（Pixel 6） | **不影响 shield 前缀**（排除） |
+
+### 关键证据
+
+**App 自己的 homefeed 响应也是 `-100 登录已过期`**（hook `RealInterceptorChain` 读取响应体确认）：
+
+```
+[XHS-CODE] .../api/sns/v6/homefeed => code=-100 msg=登录已过期 len=53
+```
+
+App 界面显示的图文是**本地缓存**（图片、标题都能显示，但请求全失败）。
+
+### 结论
+
+1. **签名链路 100% 正确** —— shield 前缀与 App 逐字符一致，服务端不再返回 406
+2. **游客会话已过期** —— 昨日可用的 `session.1794921945772602723284` 过期
+3. **新游客会话不能浏览** —— 用 activate 新造的会话请求数据返回 `-100 请登录账号`
+4. 因此：**必须登录真实账号** 才能拿到可用会话
+
+### 后续方案
+
+```
+登录账号（短信）
+  → 拿到有效会话（sid / id_token / ssk）
+  → 设备可无限伪造（deviceId 纯算法 + hmac + 签名）
+  → 会话 + 新设备 → 采集
+```
+
+设备维度可以批量造（已验证），会话维度需要账号。
