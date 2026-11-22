@@ -195,6 +195,82 @@ posts_device() = 随机 device_id + iid=0（匿名）
 - 全部失败 → `posts_degraded=True`，spider 跳过作品列表继续抓详情/评论
 - `scripts/check_posts_health.py` 可挂定时任务做健康检查
 
+## 容量规划与部署建议
+
+### 三个旋钮决定产能
+
+| 旋钮 | 作用 | 公式/实测 |
+|---|---|---|
+| `pool-size` × `interval-ms` | 签名吞吐 | `pool-size ÷ (interval/1000)`；12×500ms ≈ **21 请求/秒** |
+| worker 数 | 把签名能力跑满 | worker : 设备 ≈ **1 : 5** |
+| `comment-pages` | 每视频抓多少页评论 | 深度上限约 335 页 / 6688 条 |
+
+内存：签名实例约 **120-150MB/个**（12 实例 ≈ 1.8GB）。
+
+### 三档参考配置
+
+| 档位 | 目标 | pool-size / interval | worker | 设备目标 | DB |
+|---|---|---|---|---|---|
+| 小 | ≤ 1 万用户/天 | 6 / 500ms（12 次/秒） | 1-2 | 6-12 | SQLite |
+| 中 | 5-20 万用户/天 | 12 / 500ms（21 次/秒） | 3-4 | 20-30 | MySQL |
+| 评论重 | 深抓评论 | 12-24 / 500ms | 评论任务 4-8 副本 | 30+ | MySQL |
+
+实测基线（301 任务、全量作品翻页、评论关闭）：
+
+```
+2 worker → 6.6 QPS → 20.4 万用户/天 / 336 万视频/天
+3 worker → 9.3 QPS → 29.0 万用户/天 / 470 万视频/天
+```
+
+### 拆分部署时的资源建议
+
+```
+user 任务（详情+作品）
+  ├─ 请求特征：少而大（作品页 ~500KB），1 秒/页
+  ├─ 副本：1-2 个足够（瓶颈在签名，不在并发）
+  └─ 只影响 video_task 的生产速度
+
+comment 任务（评论）
+  ├─ 请求特征：多而小（20 条/页，0.23-0.55 秒）
+  ├─ 副本：2-4 个（可以按 backlog 扩）
+  └─ 建议 --comment-pages 3-5；抓到底（335）会让单视频任务跑 ~80 秒
+```
+
+> 两个任务共享 Redis 队列与设备的冷却状态，扩副本不需要额外协调。
+
+### 运维速查
+
+| 现象 | 先看什么 | 处理 |
+|---|---|---|
+| 采集停了但进程还在 | `redis-cli llen douyin_rev:start_urls` / `video_start_urls` | 队列空 = 没任务；队列长 = 消费端卡住 |
+| 队列长度 ≫ DB pending 数 | `dispatcher` 日志的 pushed/skipped | 投喂 guard TTL 调大，避免重复入队 |
+| 大量任务 `partial` | `user_task.last_error` / `video_task.last_error` | 看是 `spider_closed_early`（超时）还是风控 |
+| 作品列表为空 | `python scripts/check_posts_health.py --sec-uid ...` | 匿名通道挂了 → 切 iid / 降级 |
+| 详情为空 | 日志里「详情返空」 | iid 被隔离后会自动补设备；持续空则检查注册接口 |
+| 签名很慢 | `GET /api/health` 的 instances/idle | 实例不足 → 调 `--pool-size` 重启服务 |
+| 任务卡在 running | `user_task.updated_at` | 超过 `STALE_RUNNING_SEC` 自愈会自动翻回 pending |
+
+### 监控建议
+
+```bash
+# 每 5 分钟探一次作品列表通道（退出码 0=健康）
+python scripts/check_posts_health.py --sec-uid <已知有作品的用户> --loop 300
+
+# 关键指标（可直接接 Prometheus/日志告警）
+#   user_task:    pending / running / partial 计数
+#   video_task:   pending / running 计数
+#   redis 队列长度
+#   /api/health:  instances / idle / failed / backoffLevel
+```
+
+### 磁盘与清理
+
+```
+SQLite 单文件，评论 100 万条约 600MB-1GB
+MySQL 建议按月分区或定期归档 user_video_comments
+runtime/devices.jsonl 会随注册增长（每行 ~300 字节，可忽略）
+```
+
 ## 环境变量
 
 见 `.env.example`。常用：

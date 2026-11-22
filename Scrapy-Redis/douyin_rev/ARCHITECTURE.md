@@ -151,3 +151,24 @@ comment spider（video_task）
 | 断点 | video_cursor / video_index / comment_cursor | cursor / pages / fetched |
 
 关闭拆分：`DY_SPLIT_COMMENTS=0`，并把 `--spiders` 只传 `user`。
+
+## 10. 容量模型
+
+```
+签名吞吐(请求/秒) ≈ pool-size ÷ (per-device-interval-ms / 1000)
+   6 × 1500ms →  4.2        （配错了，签名就是瓶颈）
+  12 × 500ms  → 21          （推荐起步）
+
+worker 数 ≈ 签名吞吐 / 单 worker 稳定 QPS(≈3)
+设备目标 ≈ pool-size ～ 2×pool-size（评论配额按设备算）
+```
+
+| 形态 | 实测 |
+|---|---|
+| 2 worker，全量作品 | 6.6 QPS → 20.4 万用户/天 |
+| 3 worker，全量作品 | 9.3 QPS → 29.0 万用户/天 |
+| 评论单设备 | 231ms/页 → 46 条/秒 |
+| 评论深度上限 | 约 6688 条（cursor≈6680） |
+
+拆分后：user 任务负责生产 video_task，comment 任务负责消费；
+两者共享 Redis 队列与设备冷却，扩副本无需协调。
