@@ -1,0 +1,7 @@
+scrapy>=2.11
+scrapy-redis>=0.9.1
+SQLAlchemy>=2.0
+redis>=4.6,<5.0
+requests>=2.31
+python-dotenv>=1.0
+PyMySQL>=1.1

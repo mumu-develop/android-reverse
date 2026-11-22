@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+.pytest_cache/
+urls*.txt
+sec_uids*.txt
+device_probe.json
+bench_workers_result.json

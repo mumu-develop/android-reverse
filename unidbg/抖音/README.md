@@ -12,11 +12,15 @@
 
 | 文件 | 说明 |
 |---|---|
-| `dy-unidbg.py` | 主脚本（自动拉起服务） |
+| `dy-unidbg.py` | 主脚本（自动拉起服务、注册设备、签名） |
+| `dy-user-profile.py` | **用户详情** |
+| `dy-user-posts.py` | **用户作品（视频）列表** |
+| `dy-video-comments.py` | **视频评论** |
 | `DouyinSign.jar` | 常驻签名服务（Spring Boot，端口 8099） |
 | `so/libmetasec_ml.so` | 六神签名 |
 | `so/libEncryptor.so` | TTEncrypt（设备注册） |
 | `so/libc++_shared.so` | C++ 运行库 |
+| `math_comments.json` | 评论样本数据（11 MB，可删） |
 
 无第三方 Python 依赖，只用标准库。
 
@@ -24,10 +28,24 @@
 
 ## 用法
 
-```bash
-# 采集评论（服务未启动会自动拉起，约 30 秒）
-python dy-unidbg.py comments <aweme_id> -p 3 -o result.json
+### 三个接口脚本（推荐）
 
+```bash
+# 1. 用户详情：昵称/uid/粉丝/作品数/获赞
+python dy-user-profile.py <sec_user_id> -o user.json
+
+# 2. 用户作品列表：自动按 max_cursor 翻页
+python dy-user-posts.py <sec_user_id> -p 3 -o posts.json
+
+# 3. 视频评论：支持传 aweme_id 或分享链接，按 cursor 翻页
+python dy-video-comments.py <aweme_id|分享链接> -p 5 -o comments.json
+```
+
+`sec_user_id` 从哪来：评论接口返回的 `user.sec_uid`，或抖音主页链接 `/user/MS4wLjABAAAA...`。
+
+### 签名服务相关
+
+```bash
 # 对任意 URL 生成签名
 python dy-unidbg.py sign "https://aweme.snssdk.com/aweme/v2/comment/list/?..."
 
@@ -130,5 +148,11 @@ python dy-unidbg.py register -n 3 --verify   # 注册并逐台验证能否取数
 1. **必须在本目录启动服务**（脚本已处理），因为 `so/` 用的是相对路径。
 2. **端口 8099 会冲突**：本目录和 `D:\idea\IdeaProjects\douyin-sign-server` 各自都能拉起服务，
    同时只能跑一个。
-3. 评论接口只验证过 `/aweme/v2/comment/list/`；其他接口换 URL 即可，但参数要自己补齐。
-4. 请遵守目标站点的服务条款，仅用于学习研究。
+3. 已验证的接口：
+   - `/aweme/v1/user/profile/other/`（用户详情）
+   - `/aweme/v1/aweme/post/`（作品列表）
+   - `/aweme/v2/comment/list/`（评论）
+   其他接口换 URL 即可，但参数要自己补齐。
+4. **评论有可见深度上限**：cursor 到 6000-8000 后返回空页，覆盖率约 50-60%，不是 bug。
+5. **设备级限流**：每台设备约 15-20 请求/窗口，超出软封 1-3 分钟，翻页多时要放慢或换设备。
+6. 请遵守目标站点的服务条款，仅用于学习研究。
