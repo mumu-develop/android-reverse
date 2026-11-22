@@ -72,7 +72,10 @@ def main():
                     help="设备目标数（默认= pool-size；已有则只补差额，不动多余设备）")
     ap.add_argument("--video-pages", type=int, default=None)
     ap.add_argument("--comment-pages", type=int, default=None)
-    ap.add_argument("--spider", default="user")
+    ap.add_argument("--spiders", default="user,comment",
+                    help="逗号分隔：user,comment（拆分模式，一条命令跑两个 spider）")
+    ap.add_argument("--run-seconds", type=int, default=0,
+                    help="透传给 worker：跑满 N 秒自动停（0=一直跑）")
     ap.add_argument("--no-scrapy", action="store_true", help="只准备环境，不跑爬虫")
     args = ap.parse_args()
 
@@ -112,17 +115,21 @@ def main():
     if args.no_scrapy:
         return 0
 
-    # 3. scrapy
-    cmd = [sys.executable, "-m", "scrapy", "crawl", args.spider]
+    # 3. scrapy（支持一次跑多个 spider：user + comment）
+    names = [x.strip() for x in args.spiders.split(",") if x.strip()]
+    cmd = [sys.executable, str(ROOT / "scripts" / "run_worker.py"),
+           "--spiders", ",".join(names)]
     if args.video_pages is not None:
-        cmd += ["-a", "video_pages=%d" % args.video_pages]
+        cmd += ["--video-pages", str(args.video_pages)]
     if args.comment_pages is not None:
-        cmd += ["-a", "comment_pages=%d" % args.comment_pages]
+        cmd += ["--comment-pages", str(args.comment_pages)]
+    if args.run_seconds:
+        cmd += ["--run-seconds", str(args.run_seconds)]
     print("[bootstrap] 执行: %s" % " ".join(cmd), flush=True)
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT)
     rc = subprocess.call(cmd, cwd=str(ROOT), env=env)
-    print("[bootstrap] scrapy 退出码 %d" % rc, flush=True)
+    print("[bootstrap] worker 退出码 %d" % rc, flush=True)
     return rc
 
 

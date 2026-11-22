@@ -63,12 +63,30 @@ python -m scrapy crawl user -a video_pages=1 -a comment_pages=2
 
 ## Crawlab 部署
 
-Crawlab 的任务命令直接写 bootstrap（幂等，可重复执行）：
+### 方式一：一条命令跑两个 spider（默认）
 
 ```bash
-python scripts/bootstrap_worker.py --pool-size 12 --min-devices 20 \
-    --video-pages 999 --comment-pages 0
+python scripts/bootstrap_worker.py --pool-size 12 --device-target 12 \
+    --video-pages 999 --comment-pages 5
 ```
+
+等价于 `run_worker.py --spiders user,comment`：同一个进程里跑 user + comment，
+dispatcher 同时投喂两个队列。适合单机/中小批量。
+
+### 方式二：拆成两个任务（按队列扩缩容）
+
+```bash
+# 任务 A：只抓详情 + 作品（产出 video_task）
+python scripts/bootstrap_worker.py --spiders user --video-pages 999
+
+# 任务 B：只抓评论（消费 video_task）
+python scripts/bootstrap_worker.py --spiders comment --comment-pages 5
+```
+
+两个任务可以分别调副本数（评论任务通常需要更多 worker）。
+两个进程都会跑 dispatcher，但投喂有 `SETNX guard` 去重，不会重复入队。
+
+> 只跑 comment 时不需要 `--video-pages`；只跑 user 时不需要 `--comment-pages`。
 
 它按序做三件事：
 
