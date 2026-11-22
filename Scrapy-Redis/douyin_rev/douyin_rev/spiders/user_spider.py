@@ -112,6 +112,14 @@ class UserSpider(RedisSpider):
             log.info("签名策略就绪: %s", info)
         except Exception as e:
             log.warning("签名策略 warm 失败: %r", e)
+        # 初始化阶段补齐设备（Crawlab 上由 scrapy 命令触发，无需额外准备步骤）
+        try:
+            added = spider.strategy.ensure_devices()
+            if added:
+                log.info("初始化补齐设备 %d 台（现池 %d 台）",
+                         added, len(spider.strategy.pool.refresh()))
+        except Exception as e:
+            log.warning("初始化补设备失败: %r", e)
         spider.redis_key = crawler.settings.get(
             "REDIS_START_URLS_KEY", spider.redis_key)
         crawler.signals.connect(spider.on_closed, signal=signals.spider_closed)

@@ -54,6 +54,21 @@ comments→ user_video_comments（cursor 翻页，逐视频推进 video_index）
 - unidbg 服务侧是 6 个常驻实例，天然支持 6 路并行签名。
 - `AUTOTHROTTLE` 打开：被软限流会自动降速。
 
+## 4.5 设备供给时机
+
+```
+spider 启动（from_crawler）
+  ├─ strategy.warm()          探活 + 按接口探测设备可用性（结果缓存 device_probe.json）
+  └─ strategy.ensure_devices() 池里不足 DY_MIN_DEVICES 就 /api/register 补齐
+
+运行时失效
+  ├─ 详情返空 → 标记该 iid 坏 → 换设备重试 → 全坏则再注册 3 台
+  └─ 作品列表连续空 → 熔断探测 → 切换 iid → 全挂降级
+
+服务侧
+  └─ pool-size 决定并行签名实例数，启动时固定（新设备靠 fallback 签名，不影响并行度）
+```
+
 ## 5. 设备同源（本工程的关键约束）
 
 ```

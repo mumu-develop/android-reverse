@@ -21,6 +21,7 @@ douyin_rev/
 │   └── devices.jsonl                （运行时生成，注册的设备追加写入）
 ├── scripts/
 │   ├── start_sign_server.py         启动内置签名服务
+│   ├── bootstrap_worker.py          Crawlab 入口：起服务 + 补设备 + 跑 scrapy
 │   ├── seed_user_task.py            往 user_task 插任务
 │   └── run_worker.py                dispatcher + spider
 ├── tests/test_contracts.py          契约 + 自愈回归
@@ -59,6 +60,35 @@ python scripts/run_worker.py
 redis-cli lpush douyin_rev:start_urls "https://www.douyin.com/user/MS4wLjABAAAA..."
 python -m scrapy crawl user -a video_pages=1 -a comment_pages=2
 ```
+
+## Crawlab 部署
+
+Crawlab 的任务命令直接写 bootstrap（幂等，可重复执行）：
+
+```bash
+python scripts/bootstrap_worker.py --pool-size 12 --min-devices 20 \
+    --video-pages 999 --comment-pages 0
+```
+
+它按序做三件事：
+
+```
+1. 探活 8099；没起来就用 runtime/ 里的 jar 拉起（cwd=runtime）
+2. 设备数 < MY_MIN_DEVICES 就 /api/register 补齐（写入 runtime/devices.jsonl）
+3. subprocess 跑 `python -m scrapy crawl user -a video_pages=...`
+```
+
+退出码跟随 scrapy，Crawlab 能直接判成败。
+
+## 设备准备策略
+
+| 时机 | 行为 |
+|---|---|
+| **spider 初始化**（`from_crawler`） | `strategy.ensure_devices()`：池里不足 `DY_MIN_DEVICES`（默认 20）就现注册 |
+| **运行时** | 详情 iid 全部被标记坏 → 自动注册 3 台补位；作品列表熔断 → 切 iid/降级 |
+| **服务实例** | `pool-size` 决定签名并行度，启动时固定；新注册设备不影响并行度但可立即使用 |
+
+> 也就是说：**设备不用手工提前准备**，scrapy 启动就会补齐；失效了在逻辑里自动再注册。
 
 ## 四张表
 

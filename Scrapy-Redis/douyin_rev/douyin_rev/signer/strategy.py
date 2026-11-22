@@ -193,6 +193,31 @@ class UnidbgStrategy:
     def close(self) -> None:
         return None
 
+    # ---------- 设备准备（spider 初始化阶段调用） ----------
+
+    #: 池里至少保证多少台设备；不足则现注册
+    MIN_DEVICES = int(os.environ.get("DY_MIN_DEVICES", "20"))
+
+    def ensure_devices(self, min_count: Optional[int] = None) -> int:
+        """启动时补齐设备：不足 min_count 就 /api/register 现造。
+
+        返回本次新增台数。注册写 devices.jsonl，服务侧实例数不受影响
+        （签名会 fallback 到任意实例），但设备身份立刻可用于请求。
+        """
+        target = int(min_count or self.MIN_DEVICES)
+        try:
+            have = len(self.pool.refresh())
+        except Exception:
+            return 0
+        if have >= target:
+            return 0
+        need = min(target - have, 50)      # 单次最多补 50 台，防呆
+        try:
+            made = self.pool.register(need)
+            return len(made)
+        except Exception:
+            return 0
+
     # ---------- 详情侧：坏 iid 隔离 + 自动补设备 ----------
 
     #: 被判定为"详情返空"的 iid 冷却时间（秒）
