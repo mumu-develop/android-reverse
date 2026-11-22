@@ -13,7 +13,14 @@
 douyin_rev/
 ├── scrapy.cfg  requirements.txt  .env.example
 ├── sql/01_init.sql                  MySQL 建表（SQLite 自动建）
+├── runtime/                         内置签名服务（jar + so，开箱验证用）
+│   ├── DouyinSign.jar               unidbg 常驻签名服务
+│   ├── so/libmetasec_ml.so          六神签名库
+│   ├── so/libEncryptor.so           设备注册加密库
+│   ├── so/libc++_shared.so          C++ 运行库
+│   └── devices.jsonl                （运行时生成，注册的设备追加写入）
 ├── scripts/
+│   ├── start_sign_server.py         启动内置签名服务
 │   ├── seed_user_task.py            往 user_task 插任务
 │   └── run_worker.py                dispatcher + spider
 ├── tests/test_contracts.py          契约 + 自愈回归
@@ -29,9 +36,9 @@ douyin_rev/
 ## 快速开始
 
 ```bash
-# 1. 起 unidbg 签名服务（另开一个窗口，在抖音工程目录）
-cd D:\PythonProject\安卓-逆向\unidbg\抖音
-java -jar DouyinSign.jar          # 监听 8099，预热约 40 秒
+# 1. 起 unidbg 签名服务（jar 和 so 都在本工程 runtime/ 下，开箱即用）
+python scripts/start_sign_server.py --wait
+#   默认 8099、12 实例、500ms 间隔；可改 --port/--pool-size/--interval-ms
 
 # 2. 起 Redis（scrapy-redis 队列）
 D:\tools\redis\redis-server.exe

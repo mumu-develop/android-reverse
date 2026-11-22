@@ -85,3 +85,29 @@ comments→ user_video_comments（cursor 翻页，逐视频推进 video_index）
 | 设备 | 单一真机身份 | 可注册设备池 + 可用性探针 |
 | 任务表 | user_task + tiktok_task 双表 | 单表 user_task（自带断点列） |
 | 数据表 | tiktok_video 等 | user_profile / user_videos / user_video_comments |
+
+## 8. 内置运行时（runtime/）
+
+工程自带签名服务，克隆下来即可跑：
+
+```
+runtime/
+├── DouyinSign.jar       unidbg 常驻签名服务（Spring Boot，监听 8099）
+├── so/libmetasec_ml.so  六神签名库
+├── so/libEncryptor.so   设备注册加密库
+└── so/libc++_shared.so  C++ 运行库
+```
+
+启动：
+
+```bash
+python scripts/start_sign_server.py --wait
+# 等价于在 runtime/ 下执行：
+#   java -jar DouyinSign.jar --douyin.sign.pool-size=12 \
+#        --douyin.sign.per-device-interval-ms=500
+```
+
+为什么必须 `cwd=runtime/`：`application.yml` 里 `so-path` 是相对路径（`so/libmetasec_ml.so`），
+脚本已处理。`devices.jsonl` 也会生成在 `runtime/` 下。
+
+> 签名吞吐 ≈ `pool-size ÷ (interval/1000)`。12 实例 × 500ms ≈ 21 次/秒。

@@ -67,3 +67,7 @@ __pycache__/
 Xposed/sekiro-server/lib/
 Xposed/sekiro-server/logs/
 Xposed/sekiro-server/conf/
+
+# ---- douyin_rev 内置运行时（jar + 签名 so，供开箱验证）----
+!Scrapy-Redis/douyin_rev/runtime/DouyinSign.jar
+!Scrapy-Redis/douyin_rev/runtime/so/*.so
