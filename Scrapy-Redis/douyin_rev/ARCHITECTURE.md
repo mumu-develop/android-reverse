@@ -65,8 +65,9 @@ spider 启动（from_crawler）
   ├─ 详情返空 → 标记该 iid 坏 → 换设备重试 → 全坏则再注册 3 台
   └─ 作品列表连续空 → 熔断探测 → 切换 iid → 全挂降级
 
-服务侧
-  └─ pool-size 决定并行签名实例数，启动时固定（新设备靠 fallback 签名，不影响并行度）
+服务侧（新 jar 内置）
+  └─ warmUp：devices.jsonl 不足 pool-size → 用 ConfigSigner 注册补齐 → 再建实例（幂等）
+     pool-size 决定并行签名实例数；已有设备只补差额，不重复注册
 ```
 
 ## 5. 设备同源（本工程的关键约束）

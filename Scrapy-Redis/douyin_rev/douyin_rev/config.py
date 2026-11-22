@@ -83,8 +83,8 @@ TRUSTED_IIDS = [
     x.strip() for x in (get_str("DY_TRUSTED_IIDS", "") or "").split(",") if x.strip()
 ]
 
-#: spider 启动时至少要保证多少台设备（不足则自动 /api/register 补齐）
-MIN_DEVICES = get_int("DY_MIN_DEVICES", 20)
+#: 设备目标数：签名实例有多少个，就保证有多少台设备（不足自动补齐，多了不动）
+DEVICE_TARGET = get_int("DY_DEVICE_TARGET", 12)
 
 #: 抓取节奏
 DEFAULT_VIDEO_PAGES = get_int("DY_VIDEO_PAGES", 50)      # 单用户最多翻多少页作品（20/页）

@@ -68,7 +68,8 @@ def main():
     ap.add_argument("--port", type=int, default=8099)
     ap.add_argument("--pool-size", type=int, default=12)
     ap.add_argument("--interval-ms", type=int, default=500)
-    ap.add_argument("--min-devices", type=int, default=20)
+    ap.add_argument("--device-target", type=int, default=12,
+                    help="设备目标数（默认= pool-size；已有则只补差额，不动多余设备）")
     ap.add_argument("--video-pages", type=int, default=None)
     ap.add_argument("--comment-pages", type=int, default=None)
     ap.add_argument("--spider", default="user")
@@ -98,17 +99,15 @@ def main():
     st = UnidbgStrategy("http://127.0.0.1:%d" % args.port)
     st.warm()
     before = len(st.pool.refresh())
-    added = st.ensure_devices(args.min_devices)
+    added = st.ensure_devices(args.device_target)
     after = len(st.pool.refresh())
     print("[bootstrap] 设备：%d → %d（本次注册 %d）" % (before, after, added), flush=True)
 
-    # 自己拉起的服务 + 这次补了设备 → 重启一次让实例按新设备池重建
-    if added and started_by_us and proc is not None:
-        print("[bootstrap] 重启签名服务以按新设备池重建实例", flush=True)
-        proc.terminate()
-        time.sleep(3)
-        proc = start_service(args.port, args.pool_size, args.interval_ms)
-        wait_health(args.port)
+    # 服务启动时会按 pool-size 自动补齐设备（新 jar 内置），这里只做兜底校验：
+    # 若服务是外部常驻的（不是本脚本拉起），新设备不会增加实例数，但立即可用于请求。
+    if added and not started_by_us:
+        print("[bootstrap] 提示：服务由外部启动，新增设备不改变实例数；"
+              "如需提升签名并行度请重启服务并调 --pool-size", flush=True)
 
     if args.no_scrapy:
         return 0

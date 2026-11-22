@@ -195,16 +195,19 @@ class UnidbgStrategy:
 
     # ---------- 设备准备（spider 初始化阶段调用） ----------
 
-    #: 池里至少保证多少台设备；不足则现注册
-    MIN_DEVICES = int(os.environ.get("DY_MIN_DEVICES", "20"))
+    #: 设备目标数（默认等于 pool-size；配置多少建多少）
+    DEVICE_TARGET = int(os.environ.get("DY_DEVICE_TARGET", "12"))
 
-    def ensure_devices(self, min_count: Optional[int] = None) -> int:
-        """启动时补齐设备：不足 min_count 就 /api/register 现造。
+    def ensure_devices(self, target: Optional[int] = None) -> int:
+        """把设备池补到 target 台（幂等：只增不减）。
 
-        返回本次新增台数。注册写 devices.jsonl，服务侧实例数不受影响
-        （签名会 fallback 到任意实例），但设备身份立刻可用于请求。
+        - 已有 >= target → 不动（返回 0）
+        - 已有 <  target → /api/register 补差额
+
+        注册写 devices.jsonl；服务侧实例数在启动时固定，
+        新设备靠 fallback 签名即可用（不影响并行度）。
         """
-        target = int(min_count or self.MIN_DEVICES)
+        target = int(target or self.DEVICE_TARGET)
         try:
             have = len(self.pool.refresh())
         except Exception:

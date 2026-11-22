@@ -84,11 +84,11 @@ python scripts/bootstrap_worker.py --pool-size 12 --min-devices 20 \
 
 | 时机 | 行为 |
 |---|---|
-| **spider 初始化**（`from_crawler`） | `strategy.ensure_devices()`：池里不足 `DY_MIN_DEVICES`（默认 20）就现注册 |
-| **运行时** | 详情 iid 全部被标记坏 → 自动注册 3 台补位；作品列表熔断 → 切 iid/降级 |
-| **服务实例** | `pool-size` 决定签名并行度，启动时固定；新注册设备不影响并行度但可立即使用 |
+| **签名服务启动**（`warmUp`） | 读 `devices.jsonl`，不足 `pool-size` 就自动 `/api/register` 补齐再建实例（幂等，只补差额） |
+| **spider 初始化**（`from_crawler`） | `strategy.ensure_devices()` 兜底校验，目标数 `DY_DEVICE_TARGET`（默认 12） |
+| **运行时** | 详情 iid 全部坏 → 自动注册 3 台补位；作品列表熔断 → 切 iid / 降级 |
 
-> 也就是说：**设备不用手工提前准备**，scrapy 启动就会补齐；失效了在逻辑里自动再注册。
+> 结论：**配置几个实例就自动注册几台设备**；已有设备只补差额，不会重复注册，也不会删多余设备。
 
 ## 四张表
 
