@@ -86,3 +86,25 @@ CREATE TABLE IF NOT EXISTS user_video_comments (
     UNIQUE KEY uq_comments_cid (cid),
     KEY idx_comments_aweme (aweme_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频评论';
+
+-- 视频评论任务（评论拆分成独立任务；一条 = 一个视频的评论采集）
+CREATE TABLE IF NOT EXISTS video_task (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    aweme_id        VARCHAR(64) NOT NULL COMMENT '视频 ID',
+    sec_user_id     VARCHAR(128) NULL,
+    status          VARCHAR(16) NOT NULL DEFAULT 'pending'
+                    COMMENT 'pending/running/paused/partial/completed/failed',
+    priority        INT NOT NULL DEFAULT 0,
+    assigned_worker VARCHAR(64) NULL,
+    cursor          INT NOT NULL DEFAULT 0 COMMENT '评论翻页 cursor',
+    pages           INT NOT NULL DEFAULT 0,
+    fetched         INT NOT NULL DEFAULT 0 COMMENT '已入库评论数',
+    total           INT NOT NULL DEFAULT 0 COMMENT '服务端 total',
+    attempts        INT NOT NULL DEFAULT 0,
+    last_error      VARCHAR(512) NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_video_task_aweme (aweme_id),
+    KEY idx_video_task_status_prio (status, priority),
+    KEY idx_video_task_sec (sec_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频评论任务';

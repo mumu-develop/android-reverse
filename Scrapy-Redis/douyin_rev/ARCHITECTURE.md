@@ -127,3 +127,27 @@ python scripts/start_sign_server.py --wait
 脚本已处理。`devices.jsonl` 也会生成在 `runtime/` 下。
 
 > 签名吞吐 ≈ `pool-size ÷ (interval/1000)`。12 实例 × 500ms ≈ 21 次/秒。
+
+## 9. 评论拆分（video_task）
+
+```
+user spider（user_task）
+  ├─ profile → user_profile
+  ├─ videos  → user_videos（全量翻页）
+  └─ 作品抓完：把每个视频写成 video_task，user_task 置 completed
+
+comment spider（video_task）
+  ├─ 队列 douyin_rev:video_start_urls（元素 aweme_id）
+  ├─ claim_video_task → 按 cursor 翻页 → CommentItem
+  └─ 完成后 complete；被风控 -99999 换设备重试且不推进 cursor
+```
+
+| 项 | user_task | video_task |
+|---|---|---|
+| 队列键 | `douyin_rev:start_urls` | `douyin_rev:video_start_urls` |
+| 锁 | `task_lock:<id>` | `video_task_lock:<id>` |
+| 投喂 guard | `dispatch_guard:<id>` | `video_dispatch_guard:<id>` |
+| 自愈阈值 | `DY_STALE_RUNNING_SEC`(900) | `DY_VIDEO_STALE_RUNNING_SEC`(1200) |
+| 断点 | video_cursor / video_index / comment_cursor | cursor / pages / fetched |
+
+关闭拆分：`DY_SPLIT_COMMENTS=0`，并把 `--spiders` 只传 `user`。

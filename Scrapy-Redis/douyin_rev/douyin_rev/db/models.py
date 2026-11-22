@@ -77,6 +77,36 @@ class UserTask(Base):
     )
 
 
+class VideoTask(Base):
+    """评论任务表：一行 = 一个视频的评论采集。"""
+
+    __tablename__ = "video_task"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    aweme_id = Column(String(64), nullable=False, unique=True)
+    sec_user_id = Column(String(128), index=True)
+
+    # pending / running / paused / partial / completed / failed
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    priority = Column(Integer, nullable=False, default=0)
+    assigned_worker = Column(String(64))
+
+    # 断点
+    cursor = Column(Integer, nullable=False, default=0)
+    pages = Column(Integer, nullable=False, default=0)
+    fetched = Column(Integer, nullable=False, default=0)      # 已入库评论数
+    total = Column(Integer, nullable=False, default=0)        # 服务端 total
+
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(String(512))
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+    __table_args__ = (
+        Index("idx_video_task_status_prio", "status", "priority"),
+    )
+
+
 class UserProfile(Base):
     """用户详情。"""
 
@@ -143,4 +173,4 @@ class UserVideoComment(Base):
     )
 
 
-ALL_TABLES = (UserTask, UserProfile, UserVideo, UserVideoComment)
+ALL_TABLES = (UserTask, VideoTask, UserProfile, UserVideo, UserVideoComment)

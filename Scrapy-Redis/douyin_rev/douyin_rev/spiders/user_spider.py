@@ -35,7 +35,7 @@ from scrapy_redis.utils import bytes_to_str
 
 from .. import config, parser, query
 from ..db import session_scope
-from ..db.models import UserVideo
+from ..db.models import UserVideo, VideoTask
 from ..items import CommentItem, ProfileItem, VideoItem
 from ..tasks import task_state
 
@@ -180,6 +180,13 @@ class UserSpider(RedisSpider):
                              endpoint="posts")
 
         # 评论阶段
+        if config.SPLIT_COMMENTS:
+            # 拆分模式：评论由 comment spider 负责，user 任务到此为止
+            task_state.progress(tid, comments_done=True)
+            task_state.complete_task(tid, self.worker_id)
+            log.info("任务 %d 完成（详情+作品；评论已拆到 video_task）", tid)
+            return None
+
         if self.comment_pages_limit <= 0:
             task_state.progress(tid, comments_done=True)
             task_state.complete_task(tid, self.worker_id)
@@ -305,6 +312,12 @@ class UserSpider(RedisSpider):
             task_state.progress(tid, videos_done=True, video_index=0,
                                 comment_aweme_id=None, comment_cursor=0,
                                 comment_pages=0)
+            if config.SPLIT_COMMENTS:
+                n = self._enqueue_video_tasks(sec)
+                task_state.progress(tid, comments_done=True)
+                task_state.complete_task(tid, self.worker_id)
+                log.info("任务 %d 完成（详情+作品），拆出 %d 条评论任务", tid, n)
+                return
             snap = task_state.reload_task(tid)
             if snap:
                 yield self._next_request(snap)
@@ -373,6 +386,24 @@ class UserSpider(RedisSpider):
                 yield nxt
 
     # ---------- 工具 ----------
+
+    def _enqueue_video_tasks(self, sec_user_id: str) -> int:
+        """把该用户的视频写成 video_task（幂等：已存在则跳过）。"""
+        ids = self._video_ids(sec_user_id)
+        if not ids:
+            return 0
+        added = 0
+        with session_scope() as s:
+            existing = {r[0] for r in
+                        s.query(VideoTask.aweme_id)
+                        .filter(VideoTask.aweme_id.in_(ids)).all()}
+            for aid in ids:
+                if aid in existing:
+                    continue
+                s.add(VideoTask(aweme_id=aid, sec_user_id=sec_user_id,
+                                status="pending"))
+                added += 1
+        return added
 
     def _video_ids(self, sec_user_id: str) -> List[str]:
         cached = self._video_ids_cache.get(sec_user_id)

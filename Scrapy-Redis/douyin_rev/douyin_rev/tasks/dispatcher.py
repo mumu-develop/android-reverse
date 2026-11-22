@@ -17,7 +17,7 @@ import time
 from typing import Any, Dict
 
 from .. import config
-from . import task_state
+from . import task_state, video_task_state
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,16 @@ def start_urls_key() -> str:
 
 #: 投喂去重 guard 的 TTL（秒），必须 ≥ LOCK_TTL
 DISPATCH_GUARD_TTL = config.get_int("DY_DISPATCH_GUARD_TTL", 600)
+
+
+def video_start_urls_key() -> str:
+    """评论任务队列（video_task）。"""
+    prefix = config.get_str("DY_QUEUE_PREFIX", "douyin_rev") or "douyin_rev"
+    return prefix + ":video_start_urls"
+
+
+def _video_guard_key(task_id: int) -> str:
+    return "douyin_rev:video_dispatch_guard:%d" % task_id
 
 
 def _guard_key(task_id: int) -> str:
@@ -64,6 +74,30 @@ def poll_pending_and_dispatch(limit: int = 50, dry_run: bool = False) -> Dict[st
     }
 
 
+def poll_pending_video_and_dispatch(limit: int = 100, dry_run: bool = False) -> Dict[str, Any]:
+    """评论任务的一拍分发：video_task → Redis。"""
+    reclaimed = video_task_state.reclaim_stale_running_video_task()
+    rows = video_task_state.list_pending_video_tasks(limit=limit)
+    r = task_state.redis_client()
+    key = video_start_urls_key()
+
+    pushed = skipped = 0
+    for row in rows:
+        tid = row["id"]
+        if not r.set(_video_guard_key(tid), "1", nx=True, ex=DISPATCH_GUARD_TTL):
+            skipped += 1
+            continue
+        if not dry_run:
+            r.lpush(key, row["aweme_id"])
+        pushed += 1
+
+    if pushed:
+        log.info("dispatch-video: reclaimed=%d pushed=%d skipped=%d queue=%d",
+                 reclaimed, pushed, skipped, r.llen(key))
+    return {"reclaimed": reclaimed, "pushed": pushed, "skipped": skipped,
+            "queue": r.llen(key) if not dry_run else 0}
+
+
 class Dispatcher(threading.Thread):
     """后台分发线程（和 scrapy 爬虫同进程跑）。"""
 
@@ -78,6 +112,7 @@ class Dispatcher(threading.Thread):
         while not self._stop.is_set():
             try:
                 poll_pending_and_dispatch(limit=self.limit)
+                poll_pending_video_and_dispatch(limit=self.limit * 2)
             except Exception as e:  # 分发失败不能拖垮线程
                 log.warning("dispatch 失败: %r", e)
             self._stop.wait(self.interval)

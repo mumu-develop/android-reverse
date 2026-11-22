@@ -25,6 +25,8 @@ def main():
     ap.add_argument("--video-pages", type=int, default=None)
     ap.add_argument("--comment-pages", type=int, default=None)
     ap.add_argument("--run-seconds", type=int, default=0)
+    ap.add_argument("--spiders", default="user,comment",
+                    help="逗号分隔；拆分模式用 user,comment，内联模式只用 user")
     args = ap.parse_args()
 
     init_db()
@@ -42,7 +44,8 @@ def main():
         kwargs["video_pages"] = args.video_pages
     if args.comment_pages is not None:
         kwargs["comment_pages"] = args.comment_pages
-    process.crawl("user", **kwargs)
+    for name in [x.strip() for x in args.spiders.split(",") if x.strip()]:
+        process.crawl(name, **kwargs)
     process.start()
 
 

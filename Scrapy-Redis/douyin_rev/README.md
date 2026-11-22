@@ -90,28 +90,51 @@ python scripts/bootstrap_worker.py --pool-size 12 --min-devices 20 \
 
 > 结论：**配置几个实例就自动注册几台设备**；已有设备只补差额，不会重复注册，也不会删多余设备。
 
-## 四张表
+## 两种任务：user_task + video_task
+
+评论默认拆成独立任务，两个 spider 分工：
+
+```
+user_task  →  user spider     抓 用户详情 + 作品列表（全量翻页）
+                 └─ 抓完作品后，把每个视频写成一条 video_task
+video_task →  comment spider  抓 单个视频的评论（独立翻页 / 断点）
+```
+
+**为什么要拆**：user spider 里「详情→作品→逐个视频评论」是串行链，
+一个用户的评论有几千个请求时会占着一条链几小时；拆开后同一用户的多个视频可并行，
+断点粒度也从「视频级」细化到「评论页级」。
+
+想回到内联模式（一个 spider 全干）：`DY_SPLIT_COMMENTS=0` + `--spiders user`。
+
+### 五张表
 
 | 表 | 内容 | 唯一键 |
 |---|---|---|
-| `user_task` | 任务 + 断点（cursor / 页码 / 阶段） | `user_url` |
-| `user_profile` | 用户详情（昵称/uid/抖音号/粉丝/获赞） | `sec_user_id` |
-| `user_videos` | 作品列表（aweme_id/描述/点赞/评论数/播放地址） | `aweme_id` |
-| `user_video_comments` | 评论（cid/内容/点赞/作者） | `cid` |
+| `user_task` | 用户任务 + 断点 | `user_url` |
+| `video_task` | 评论任务 + 断点（cursor/pages/fetched） | `aweme_id` |
+| `user_profile` | 用户详情 | `sec_user_id` |
+| `user_videos` | 作品列表 | `aweme_id` |
+| `user_video_comments` | 评论 | `cid` |
 
 MySQL 建表用 `sql/01_init.sql`；不配 `DY_DB_URL` 时自动落 SQLite（`douyin_rev.db`）。
 
 ## 断点续跑
 
-`user_task` 上的断点列：
+`user_task` 上的断点列（详情 + 作品）：
 
 ```
 video_cursor      作品列表 max_cursor（毫秒时间戳，BIGINT）
 video_pages       已翻页数
-video_index       评论阶段：处理到第几个视频
-comment_aweme_id  当前视频
-comment_cursor    评论 cursor（整数）
-comment_pages     该视频已翻页数
+profile_done / videos_done / comments_done
+```
+
+`video_task` 上的断点列（单视频评论）：
+
+```
+cursor            评论 cursor（整数）
+pages             已翻页数
+fetched           已入库评论数
+total             服务端 total
 ```
 
 进程崩了之后，`dispatcher` 每拍开头先跑 `reclaim_stale_running_user_task()`，

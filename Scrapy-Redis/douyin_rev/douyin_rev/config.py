@@ -86,6 +86,9 @@ TRUSTED_IIDS = [
 #: 设备目标数：签名实例有多少个，就保证有多少台设备（不足自动补齐，多了不动）
 DEVICE_TARGET = get_int("DY_DEVICE_TARGET", 12)
 
+#: 评论是否拆成独立任务（1=拆：user spider 只抓详情+作品，comment spider 抓评论）
+SPLIT_COMMENTS = get_bool("DY_SPLIT_COMMENTS", True)
+
 #: 抓取节奏
 DEFAULT_VIDEO_PAGES = get_int("DY_VIDEO_PAGES", 50)      # 单用户最多翻多少页作品（20/页）
 DEFAULT_COMMENT_PAGES = get_int("DY_COMMENT_PAGES", 335)  # 单视频最多翻多少页评论（20/页）

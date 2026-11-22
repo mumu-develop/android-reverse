@@ -115,3 +115,59 @@ def test_dispatcher_guard_ttl_ge_lock_ttl():
     """投喂 guard TTL 必须 ≥ 任务锁 TTL（否则会重复投喂）。"""
     from douyin_rev.tasks import dispatcher, task_state
     assert dispatcher.DISPATCH_GUARD_TTL >= task_state.LOCK_TTL
+
+
+# ---------- video_task（评论拆分） ----------
+
+def test_video_task_reclaim_keeps_cursor(db):
+    """评论任务卡死自愈：翻回 pending 且保留 cursor/pages/fetched。"""
+    from douyin_rev.db import session_scope
+    from douyin_rev.db.models import VideoTask
+    from douyin_rev.tasks import video_task_state as vts
+
+    with session_scope() as s:
+        row = VideoTask(aweme_id="TEST_VIDEO_STALE", status=vts.ST_RUNNING,
+                        assigned_worker="w1", cursor=120, pages=6, fetched=115,
+                        updated_at=datetime.now() - timedelta(seconds=3600))
+        s.add(row)
+        s.flush()
+        tid = row.id
+
+    n = vts.reclaim_stale_running_video_task(threshold_sec=600)
+    assert n >= 1
+    with session_scope() as s:
+        r = s.get(VideoTask, tid)
+        assert r.status == vts.ST_PENDING
+        assert r.assigned_worker is None
+        assert r.cursor == 120 and r.pages == 6 and r.fetched == 115
+
+
+def test_video_task_lock_ttl_gt_lock(db):
+    """自愈阈值必须大于锁 TTL（否则锁没释放就被回收）。"""
+    from douyin_rev.tasks import video_task_state as vts
+    assert vts.STALE_RUNNING_SEC > vts.LOCK_TTL
+
+
+def test_video_task_claim_mutex(db):
+    """同一个视频任务只能被一个 worker 抢到。"""
+    import pytest
+    from douyin_rev.db import session_scope
+    from douyin_rev.db.models import VideoTask
+    from douyin_rev.tasks import video_task_state as vts
+
+    try:
+        vts._redis().ping()
+    except Exception:
+        pytest.skip("Redis 不可用，跳过互斥测试")
+
+    with session_scope() as s:
+        row = VideoTask(aweme_id="TEST_VIDEO_LOCK", status=vts.ST_PENDING)
+        s.add(row)
+        s.flush()
+        tid = row.id
+
+    assert vts.claim_video_task(tid, "worker-A") is True
+    assert vts.claim_video_task(tid, "worker-B") is False
+    vts.complete_video_task(tid)
+    with session_scope() as s:
+        assert s.get(VideoTask, tid).status == vts.ST_COMPLETED

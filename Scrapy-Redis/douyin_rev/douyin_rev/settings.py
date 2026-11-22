@@ -56,6 +56,7 @@ REDIS_URL = config.get_str("DY_REDIS_URL") or "redis://%s:%d/%d" % (
 
 # start_urls 队列键（与 tasks/dispatcher.py 保持一致）
 REDIS_START_URLS_KEY = "%s:start_urls" % QUEUE_PREFIX
+REDIS_VIDEO_START_URLS_KEY = "%s:video_start_urls" % QUEUE_PREFIX
 REDIS_START_URLS_AS_SET = False
 
 # ---------- 中间件 / 管道 ----------
