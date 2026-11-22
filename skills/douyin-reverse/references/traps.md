@@ -6,12 +6,40 @@
 
 ### A1. 服务端返回 `-99999`
 
-**别急着怀疑签名算法。** 90% 是请求参数不全。
+**别急着怀疑签名算法。** 两种原因，先分清：
 
-| 现象 | 缺什么 |
+| 现象 | 原因 |
 |---|---|
-| `{"has_more":0,"status_code":0,"comments":[],"total":0}` + 尾随 `-99999` | 参数不全 |
+| `{"has_more":0,"status_code":0,"comments":[],"total":0}` + 尾随 `{"status_code":-99999}` | ① 参数不全 ② **设备级限流** |
 | `status_code=-99999` 且无 comments | 同上 |
+
+**限流响应是「两个 JSON 拼接」**，这是最容易踩的一步：
+
+```
+{ "has_more": 0,"status_code": 0,"comments": []}
+{"log_pb":{"impr_id":"..."},"status_code":-99999,"status_msg":""}
+```
+
+标准 `json.loads` 直接抛 `Extra data: line 2 column 1` → 整页被当失败丢弃。
+正确解析：
+
+```python
+def decode_stream(text):
+    objs, dec, idx, n = [], json.JSONDecoder(strict=False), 0, len(text)
+    while idx < n:
+        while idx < n and text[idx] in " \r\n\t":
+            idx += 1
+        if idx >= n:
+            break
+        obj, idx = dec.raw_decode(text, idx)
+        objs.append(obj)
+    return objs      # objs[0] 是页面数据；objs[1:] 里出现 -99999 就是被限流
+```
+
+**处理策略（关键）**：
+- 检测到 `-99999` → **不推进 cursor**，换一台设备重试同一页（最多 2 次）
+- 该设备进冷却（见 `fetch-tuning.md` 的设备冷却调度）
+- 若把它当"空页/到底"，会**静默丢数据**：实测 672 页"空响应"里大量是限流而非真没数据
 
 必备参数（缺一不可）：
 
@@ -61,6 +89,42 @@ _rticket ts aweme_id cursor count
 ### A5. `count` 传 100 只返回 50
 
 **上限就是 50。** 传更大值无效，不会报错。
+
+### A6. 新设备 / 新 iid 拿不到作品列表（200 + 空 body）
+
+**现象**：`/aweme/v1/aweme/post/` 返回 HTTP 200、`content-type: application/json`、**body 长度 0**。
+不报错、不给 `status_code`，非常容易误判成签名失败。
+
+**原因**：服务端按 **iid（安装身份）** 做信任分级。
+
+| iid | 作品列表 |
+|---|---|
+| 真机注册的 iid | ✅ 正常 |
+| `/api/register` 造的 iid（`new_user=1`） | ❌ 200 + 空 body |
+| **`iid=0`（匿名）** | ✅ **正常** |
+
+已排除的无效手段：`X-Tt-Token`、`Cookie: ttwid=`、`new_user=0`、`cold_start=1`、
+feed/settings/app_log 预热、注册后等 18 小时 —— 全部返空。
+
+**处理**：作品列表用**匿名 `iid=0`**；详情用真实 iid（任意新 iid 都行）。
+完整生命周期与容错设计见 `identity-and-quota.md`。
+
+### A7. 本机调签名服务被系统代理劫持
+
+**现象**：`urllib` / `requests` 调 `http://127.0.0.1:8099` 超时或报连接错误，
+但浏览器能打开。
+
+**原因**：Python 的 `urllib` 会读 Windows 系统代理（Charles / Clash 常驻），
+把 `127.0.0.1` 也发给代理，代理再回环 → 死等。
+
+**处理**：
+
+```python
+os.environ["NO_PROXY"] = "127.0.0.1,localhost"     # 必须在 import 之后、发请求之前
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # 显式禁用代理
+```
+
+`requests` 用 `session.trust_env = False` 或同样的 `NO_PROXY`。
 
 ## B. unidbg 层面
 

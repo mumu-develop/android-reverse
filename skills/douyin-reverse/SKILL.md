@@ -16,6 +16,8 @@ description: 在逆向抖音/TikTok（com.ss.android.ugc.aweme）时使用 —�
 | 需要查 op 码 / 配置 JSON / 头字段 / 注册字段 | — | `references/sixgod-contract.md` |
 | 卡住了：签名失败、`-99999`、初始化随机失败 | — | `references/traps.md` |
 | **抓取慢 / 抓不齐 / 被限流** | — | `references/fetch-tuning.md` |
+| **要抓用户详情 / 作品列表 / 评论**（先看各接口对身份的要求） | — | `references/api-matrix.md` |
+| **设备或 iid 被封 / 新设备拿不到作品列表** | — | `references/identity-and-quota.md` |
 | **换版本**（40.x → 41.x 等） | — | `references/version-adaptation.md` |
 | 要一份能跑的骨架 | — | `assets/minimal-harness/` |
 | 要验证"现在到底通没通" | — | `scripts/dy-selfcheck.py` |
@@ -42,6 +44,9 @@ assets/minimal-harness/           # 可直接 mvn package 跑的最小工程
 scripts/dy-selfcheck.py              # 自检：health / sign / request / register
   python dy-selfcheck.py --service http://127.0.0.1:8099 --with-register
   python dy-selfcheck.py --java-project <工程目录> --device-id .. --install-id ..
+
+scripts/bench_workers.py             # 吞吐压测：按 worker 数跑全量翻页，输出日均容量
+scripts/check_posts_health.py        # 作品列表通道健康检查（可挂定时任务/告警）
 ```
 
 ## 0. 先判断走哪条（30 秒）—— 但必须让用户拍板
@@ -63,15 +68,27 @@ scripts/dy-selfcheck.py              # 自检：health / sign / request / regist
 **关键认知 1**：40.x 的六神签名**不能纯 Python 重写**。签名逻辑在 `libmetasec_ml.so` 的 VMP + JIT 里，
 且**部分头由 `libsscronet.so` 组装**。要么仿真跑 so，要么让真机算。别浪费时间找"算法还原"。
 
-**关键认知 2**：签名不是瓶颈（100% 成功、48ms）。**抓取受抖音的「设备级限流」+「深度上限」双重约束**：
+**关键认知 2**：签名**单次**很快（48ms、成功率近 100%），但**签名吞吐 ≠ 单次耗时**，
+它由「实例数 ÷ 单设备间隔」决定 —— 配错了它会成为整个采集链的天花板：
+
+```
+签名吞吐(次/秒) ≈ pool-size ÷ (per-device-interval-ms / 1000)
+
+实测：pool-size=6  + interval=1500ms → 4.2 次/秒   ← 严重卡脖子
+      pool-size=12 + interval=500ms  → 21  次/秒
+```
+
+签名吞吐上来之后，才轮到「接口身份限制」+「设备级限流」+「深度上限」这些真正的采集约束：
 
 | 约束 | 现实 |
 |---|---|
 | 单视频可见深度 | 约 6000-8000 条，超过返回空页（total 13013 的视频只能拿 50-60%） |
-| 设备级限流 | 每台设备独立配额（约 20-40 请求/窗口），超出软封 1-3 分钟 |
+| 设备级限流 | 每台设备独立配额（约 15-40 请求/窗口），超出返回 `-99999` |
 | 是否 IP 级 | **不是**。实测：池内设备全冷却时，全新设备一次就通 |
+| 接口身份 | **详情必须真实 iid；作品列表匿名 iid=0 即可；评论任意**（见 `api-matrix.md`） |
 
-推荐参数：并发 4、8 req/s、最多 150 页，30-60 秒拿 6000-7000 条。
+推荐：签名池按「目标 QPS × 单次耗时」倒推实例数；抓取侧 2-4 worker、全量翻页。
+实测基线（301 任务、全量作品列表）：2 worker ≈ 6.6 QPS（20 万用户/天），3 worker ≈ 9.3 QPS（29 万用户/天）。
 详见 `references/fetch-tuning.md`。
 
 ## 1. 两条路线的能力边界
@@ -98,7 +115,17 @@ scripts/dy-selfcheck.py              # 自检：health / sign / request / regist
 | X-Gorgon 形态 | 52 位十六进制，固定以 `8404` 开头 |
 | 注册端点 | `https://log.snssdk.com/service/2/device_register/` |
 | 评论端点 | `https://aweme.snssdk.com/aweme/v2/comment/list/` |
+| 作品列表端点 | `https://aweme.snssdk.com/aweme/v1/aweme/post/` |
+| 用户详情端点 | `https://aweme.snssdk.com/aweme/v1/user/profile/other/` |
 | `sig_hash`（40.2.0） | `aea615ab910015038f73c47e45d21466` |
+
+**三个业务接口对「设备身份」的要求完全不同**（最容易踩的坑，详见 `references/api-matrix.md`）：
+
+| 接口 | 需要什么身份 | 说明 |
+|---|---|---|
+| 用户详情 | **真实 iid** | `iid=0` 返回 `status_code=0` 但 `user` 为空 |
+| 作品列表 | **匿名 `iid=0`** | 新注册 iid（`new_user=1`）会静默返回 200 + 空 body |
+| 评论 | 任意（真实或匿名） | 新设备也能抓 |
 
 **头字段名只存在于 `libsscronet.so`**，`libmetasec_ml.so` 里一个都没有。
 → 说明 `frameSign` 产出的是签名材料，最终头由 sscronet 组装/格式化。
@@ -143,8 +170,11 @@ scripts/dy-selfcheck.py              # 自检：health / sign / request / regist
 
 ### 3.2 其他纪律
 
-- **`-99999` 不等于签名错**：90% 是**请求参数不全**（缺 `cdid`/`device_brand`/`resolution` 等），
-  先补齐参数再怀疑算法。详见 `traps.md`。
+- **`-99999` 不等于签名错**：两种原因，先分清再怀疑算法 ——
+  ① **请求参数不全**（缺 `cdid`/`device_brand`/`resolution` 等）；
+  ② **设备级限流**（同一设备请求太密）。
+  注意限流响应的形态是「两个 JSON 拼接」，标准 `json.loads` 会抛 `Extra data` 把整页丢掉。
+  详见 `traps.md` A1。
 - **不要把项目常量写进技能**：license、device_id、cdid 属于具体项目，放项目 README。
 - **记录三件事**：走了哪条路、用的哪个版本、验证用的什么请求。
 
