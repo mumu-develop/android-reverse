@@ -1,4 +1,4 @@
-# 三个业务接口对照表（40.2.0 实测）
+# 业务接口对照表（40.2.0 实测）
 
 只写「能直接拿去发请求」的部分：路径、必需参数、返回字段、身份要求、坑。
 
@@ -174,3 +174,81 @@ comments = call("/aweme/v2/comment/list/", p, dev["device_id"])
 ```
 
 设备画像（`dev`）从签名服务的 `GET /api/devices` 拿，或自己维护一份。
+
+---
+
+## 6. 搜索（40.2.0 实测）
+
+搜索有**两个列表接口**，按 tab 分工，别找错：
+
+| 用途 | 接口 | 方法 | 关键参数位置 |
+|---|---|---|---|
+| 综合首屏 | `/aweme/v2/search/general/single/` | GET | query（`keyword`） |
+| 综合滚动加载 | `/aweme/v2/search/general/stream/` | GET | query |
+| **视频 tab / 翻页** | **`/aweme/v2/search/item/`** | **POST** | **表单 body** |
+| 联想词 | `tsearch.amemv.com/aweme/v1/search/vtag/` | POST | body |
+| 相关搜索 | `/aweme/v1/search/refresh_related_search/` | GET | query |
+| 热榜 | `api.amemv.com/aweme/v1/hot/search/list/` | GET | query |
+| 预取回执 | `/aweme/v2/search/general/prefetch/ack/` | GET | query（无数据，只有 `ok`） |
+
+### 6.1 `search/item` 请求（列表主力）
+
+```
+POST https://aweme.snssdk.com/aweme/v2/search/item/?<公共参数>
+Content-Type: application/x-www-form-urlencoded
+
+keyword=火锅&cursor=0&count=12&search_scene=douyin_search
+&query_correct_type=1&token=search&enter_from=...
+```
+
+| body 字段 | 说明 |
+|---|---|
+| `keyword` | 搜索词（URL 编码） |
+| `cursor` | 首页 `0`，之后用上一页返回的 `cursor`，实测每页 **+12** |
+| `count` | 实测 **12** |
+| `search_scene` | `douyin_search` |
+| `query_correct_type` | `1` |
+| `token` | `search` |
+| 其它 | `location_access` / `device_score` / `bcm_chain` / `enter_from`，非必需 |
+
+> **注意**：`keyword` 在 body 里，URL 上只有一个 `klink_egdi` 和公共参数。
+> 只看 URL 会误判「没抓到关键词」。
+
+### 6.2 响应结构
+
+```jsonc
+{
+  "business_data": [
+    {"data_id":"0","type":1,"data":{"type":1,
+      "aweme_info":{ "aweme_id":"...", "desc":"...",
+                     "author":{"nickname":"...","sec_uid":"..."},
+                     "statistics":{"digg_count":595,"comment_count":11} }}}
+  ],
+  "business_config": {
+    "keyword": "火锅",          // 服务端回显，可校验请求是否被正确识别
+    "has_more": 1,
+    "card_count": 2,
+    "next_page": {"cursor": 10, "search_id": "2026...", "keyword": "火锅"}
+  },
+  "status_code": 0
+}
+```
+
+`business_config.keyword` 是最省事的**校验点**：返回里带的就是服务端认为的搜索词。
+
+### 6.3 已验证的对应关系
+
+页面卡片 ↔ `business_data[].data.aweme_info`：
+`desc` / `author.nickname` / `statistics.digg_count` 三项与屏幕完全一致。
+
+### 6.4 抓包要点（用 hook 验证时）
+
+| 现象 | 原因 |
+|---|---|
+| URL 里没有 `keyword` | 参数在 POST body |
+| hook 显示 `GET` | method 没抓到，默认成了 GET；实际是 POST |
+| 只看到 `{"vote":false...}` | 命中的是回执接口，不是列表 |
+| 列表数据看不到 | 响应 50 万字节，hook 预览截断在 1300 字符 |
+
+请求体只能在 **Retrofit 层**（`com.bytedance.retrofit2.CallServerInterceptor`）拿，
+Cronet 层的 body 走 native，抓不到。详见 `traps.md` A8。

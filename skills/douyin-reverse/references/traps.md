@@ -126,6 +126,39 @@ opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # 显式
 
 `requests` 用 `session.trust_env = False` 或同样的 `NO_PROXY`。
 
+
+### A8. 搜索「抓不到」：参数在 POST body，不在 URL
+
+**现象**：hook 抓了抖音搜索，URL 里只有 `iid/device_id/aid/klink_egdi`，看不到 `keyword`，
+于是判断「搜索接口没抓到」。但页面上的列表数据其实是有的。
+
+**原因**（三层）：
+
+1. **参数在 body**：`/aweme/v2/search/item/` 是 **POST + form**，
+   `keyword`/`cursor`/`count`/`search_id` 全在请求体里
+2. **method 显示错**：hook 从构造参数里取 method，取不到就默认 `GET`，
+   于是 POST 请求被当成 GET 打印
+3. **Cronet 层抓不到 body**：抖音的 POST body 交给 native（`UploadDataProvider`
+   在 TTNet 里不存在），所以 Cronet hook 永远拿不到请求体
+
+**对策**：在 **Retrofit 层**拦：
+
+```java
+// chain.request() → com.bytedance.retrofit2.client.Request
+XposedHelpers.hookAllMethods(
+    XposedHelpers.findClass("com.bytedance.retrofit2.CallServerInterceptor", cl),
+    "intercept", cb);
+
+// body 是 TypedOutput，用 writeTo 万能序列化（表单/字节/JSON 都适用）
+ByteArrayOutputStream bos = new ByteArrayOutputStream();
+XposedHelpers.callMethod(body, "writeTo", bos);
+String form = new String(bos.toByteArray(), StandardCharsets.UTF_8);
+// 再 URLDecoder 解成 JSON
+```
+
+**注意**：去重要按 `method + url + body`。翻页时 URL 完全一样、
+只有 body 里的 `cursor` 变，只按 URL 去重会把翻页请求全吞掉。
+
 ## B. unidbg 层面
 
 ### B1. `frameSign` / `0x2000006` 返回 null，且重试无效

@@ -17,6 +17,7 @@ description: 在逆向抖音/TikTok（com.ss.android.ugc.aweme）时使用 —�
 | 卡住了：签名失败、`-99999`、初始化随机失败 | — | `references/traps.md` |
 | **抓取慢 / 抓不齐 / 被限流** | — | `references/fetch-tuning.md` |
 | **要抓用户详情 / 作品列表 / 评论**（先看各接口对身份的要求） | — | `references/api-matrix.md` |
+| **要抓搜索结果 / 搜索翻页**（两个列表接口 + POST body 参数） | — | `references/api-matrix.md`（第 4 节） |
 | **设备或 iid 被封 / 新设备拿不到作品列表** | — | `references/identity-and-quota.md` |
 | **换版本**（40.x → 41.x 等） | — | `references/version-adaptation.md` |
 | 要一份能跑的骨架 | — | `assets/minimal-harness/` |
